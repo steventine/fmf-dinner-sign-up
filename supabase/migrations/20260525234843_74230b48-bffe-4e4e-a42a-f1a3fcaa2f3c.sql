@@ -1,0 +1,1 @@
+ALTER TABLE public.settings DROP COLUMN IF EXISTS season_start, DROP COLUMN IF EXISTS season_end;

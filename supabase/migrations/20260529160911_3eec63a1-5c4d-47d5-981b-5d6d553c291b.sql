@@ -1,0 +1,1 @@
+UPDATE public.buy_outs SET season_year = 2026 WHERE season_year = 2025;
