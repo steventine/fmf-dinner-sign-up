@@ -1,3 +1,10 @@
+# Environment variables
+.env
+.env.*
+
+# Claude Code
+.claude/
+
 # Logs
 logs
 *.log
@@ -15,6 +22,9 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+
+# Supabase local state
+supabase/.temp/
 
 # Wrangler / Cloudflare
 .wrangler/

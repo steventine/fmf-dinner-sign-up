@@ -1,7 +1,5 @@
-// Server-only Resend helper (via Lovable connector gateway) + DB-backed templates.
+// Server-only Resend helper + DB-backed templates.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
 
 export async function sendEmailViaResend(args: {
   to: string;
@@ -9,17 +7,14 @@ export async function sendEmailViaResend(args: {
   html: string;
   from?: string;
 }) {
-  const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
 
-  const res = await fetch(`${GATEWAY_URL}/emails`, {
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "X-Connection-Api-Key": RESEND_API_KEY,
+      Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
       from: args.from ?? "Falcons Dinners <dinners@fmf.tinefamily.com>",
