@@ -1,5 +1,11 @@
 // Server-only Resend helper + DB-backed templates.
+import { marked } from "marked";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+function markdownToEmailHtml(markdown: string): string {
+  const body = marked.parse(markdown) as string;
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;line-height:1.5">${body}</body></html>`;
+}
 
 export async function sendEmailViaResend(args: {
   to: string;
@@ -50,14 +56,15 @@ export async function renderAndSendTemplate(args: {
 }) {
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
-    .select("subject, html_body")
+    .select("subject, markdown_body")
     .eq("key", args.key)
     .maybeSingle();
   if (error) throw new Error(`Template lookup failed: ${error.message}`);
   if (!tpl) throw new Error(`Email template not found: ${args.key}`);
 
   const subject = renderTemplateString(tpl.subject, args.variables);
-  const html = renderTemplateString(tpl.html_body, args.variables);
+  const markdown = renderTemplateString(tpl.markdown_body, args.variables);
+  const html = markdownToEmailHtml(markdown);
 
   return sendEmailViaResend({ to: args.to, subject, html });
 }

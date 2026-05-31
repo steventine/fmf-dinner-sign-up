@@ -94,7 +94,7 @@ export type Database = {
         Row: {
           available_variables: string[]
           description: string
-          html_body: string
+          markdown_body: string
           key: string
           name: string
           subject: string
@@ -104,7 +104,7 @@ export type Database = {
         Insert: {
           available_variables?: string[]
           description?: string
-          html_body: string
+          markdown_body: string
           key: string
           name: string
           subject: string

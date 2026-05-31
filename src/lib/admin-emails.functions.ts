@@ -18,7 +18,7 @@ export const adminListEmailTemplates = createServerFn({ method: "POST" }).handle
     await requireAdminUserId();
     const { data, error } = await supabaseAdmin
       .from("email_templates")
-      .select("key, name, description, subject, html_body, available_variables, updated_at")
+      .select("key, name, description, subject, markdown_body, available_variables, updated_at")
       .order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -31,7 +31,7 @@ export const adminUpdateEmailTemplate = createServerFn({ method: "POST" })
       .object({
         key: z.string().min(1).max(64),
         subject: z.string().min(1).max(500),
-        html_body: z.string().min(1).max(50000),
+        markdown_body: z.string().min(1).max(50000),
       })
       .parse(input),
   )
@@ -41,7 +41,7 @@ export const adminUpdateEmailTemplate = createServerFn({ method: "POST" })
       .from("email_templates")
       .update({
         subject: data.subject,
-        html_body: data.html_body,
+        markdown_body: data.markdown_body,
         updated_at: new Date().toISOString(),
         updated_by: adminId,
       })

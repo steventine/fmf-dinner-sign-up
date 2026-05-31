@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { marked } from "marked";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -29,12 +30,17 @@ const SAMPLE_VARIABLES: Record<string, string> = {
   dinner: "Lasagna",
 };
 
-function renderPreview(input: string): string {
+function substituteVariables(input: string): string {
   return input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, name) =>
     Object.prototype.hasOwnProperty.call(SAMPLE_VARIABLES, name)
       ? SAMPLE_VARIABLES[name]
       : match,
   );
+}
+
+function markdownToPreviewHtml(markdown: string): string {
+  const body = marked.parse(substituteVariables(markdown)) as string;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;line-height:1.5}a{color:#1e3a8a}</style></head><body>${body}</body></html>`;
 }
 
 function AdminEmails() {
@@ -50,7 +56,7 @@ function AdminEmails() {
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
-  const [htmlBody, setHtmlBody] = useState("");
+  const [markdownBody, setMarkdownBody] = useState("");
   const [testEmail, setTestEmail] = useState("");
 
   useEffect(() => {
@@ -66,10 +72,9 @@ function AdminEmails() {
   useEffect(() => {
     if (!selected) return;
     setSubject(selected.subject);
-    setHtmlBody(selected.html_body);
+    setMarkdownBody(selected.markdown_body);
   }, [selected]);
 
-  // Default the test recipient to the logged-in admin's email.
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getUser().then(({ data }) => {
@@ -77,18 +82,14 @@ function AdminEmails() {
         setTestEmail(data.user.email);
       }
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const save = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error("No template selected");
-      return update({
-        data: { key: selected.key, subject, html_body: htmlBody },
-      });
+      return update({ data: { key: selected.key, subject, markdown_body: markdownBody } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
@@ -107,19 +108,19 @@ function AdminEmails() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const previewSubject = useMemo(() => renderPreview(subject), [subject]);
-  const previewHtml = useMemo(() => renderPreview(htmlBody), [htmlBody]);
+  const previewSubject = useMemo(() => substituteVariables(subject), [subject]);
+  const previewHtml = useMemo(() => markdownToPreviewHtml(markdownBody), [markdownBody]);
 
   const isDirty =
     selected !== null &&
-    (subject !== selected.subject || htmlBody !== selected.html_body);
+    (subject !== selected.subject || markdownBody !== selected.markdown_body);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Email templates</h1>
         <p className="text-sm text-muted-foreground">
-          Edit the emails the app sends. Use{" "}
+          Write templates in Markdown. Use{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">{`{{variable_name}}`}</code>{" "}
           placeholders — they're replaced when the email is sent.
         </p>
@@ -142,22 +143,18 @@ function AdminEmails() {
               </li>
             ))}
             {(!templates || templates.length === 0) && (
-              <li className="px-3 py-2 text-sm text-muted-foreground">
-                No templates yet.
-              </li>
+              <li className="px-3 py-2 text-sm text-muted-foreground">No templates yet.</li>
             )}
           </ul>
         </Card>
 
         {selected ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card className="space-y-4 p-6">
               <div>
                 <h2 className="text-lg font-semibold">{selected.name}</h2>
                 {selected.description && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {selected.description}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{selected.description}</p>
                 )}
                 {selected.available_variables?.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -179,14 +176,34 @@ function AdminEmails() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="html">HTML body</Label>
-                <Textarea
-                  id="html"
-                  value={htmlBody}
-                  onChange={(e) => setHtmlBody(e.target.value)}
-                  className="min-h-[260px] font-mono text-xs"
-                />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="markdown">Body (Markdown)</Label>
+                  <Textarea
+                    id="markdown"
+                    value={markdownBody}
+                    onChange={(e) => setMarkdownBody(e.target.value)}
+                    className="min-h-[340px] font-mono text-sm"
+                    placeholder="Write your email in Markdown…"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Preview</Label>
+                    <span className="text-xs text-muted-foreground">Sample values substituted</span>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
+                    <span className="text-xs text-muted-foreground">Subject:</span>{" "}
+                    <span className="font-medium">{previewSubject}</span>
+                  </div>
+                  <iframe
+                    title="Email preview"
+                    srcDoc={previewHtml}
+                    sandbox=""
+                    className="h-[290px] w-full rounded-md border border-border bg-white"
+                  />
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -211,32 +228,9 @@ function AdminEmails() {
                 </div>
               </div>
             </Card>
-
-            <Card className="space-y-3 p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Preview
-                </h3>
-                <span className="text-xs text-muted-foreground">
-                  Sample values substituted
-                </span>
-              </div>
-              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-                <span className="text-xs text-muted-foreground">Subject:</span>{" "}
-                <span className="font-medium">{previewSubject}</span>
-              </div>
-              <iframe
-                title="Email preview"
-                srcDoc={previewHtml}
-                sandbox=""
-                className="h-[420px] w-full rounded-md border border-border bg-white"
-              />
-            </Card>
           </div>
         ) : (
-          <Card className="p-6 text-sm text-muted-foreground">
-            Select a template to edit.
-          </Card>
+          <Card className="p-6 text-sm text-muted-foreground">Select a template to edit.</Card>
         )}
       </div>
     </div>
