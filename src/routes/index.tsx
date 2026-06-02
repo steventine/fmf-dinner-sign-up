@@ -24,10 +24,10 @@ import type { MeetingRow } from "@/lib/calendar";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Full-Metal Falcons Dinner Sign-up" },
+      { title: "FullMetal Falcons Dinner Sign-up" },
       {
         name: "description",
-        content: "Sign up to provide dinner at Full-Metal Falcons robotics team meetings.",
+        content: "Sign up to provide dinner at FullMetal Falcons robotics team meetings.",
       },
     ],
   }),
@@ -64,7 +64,7 @@ function PublicCalendarPage() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl items-start justify-between gap-4 px-4 py-8 sm:py-12">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Full-Metal Falcons Robotics</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">FullMetal Falcons Robotics</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Team Dinner Sign-up</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base my-[9px]">
               Please bring your dinner to Xavier at 6pm. Dinner should include a main entree; a side or dessert is nice

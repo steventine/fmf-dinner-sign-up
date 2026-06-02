@@ -29,10 +29,10 @@ INSERT INTO public.email_templates (key, name, description, subject, html_body, 
 ('parent_link',
  'Parent sign-in link',
  'Sent when a parent requests their magic-link from the public Sign in dialog.',
- 'Your Full-Metal Falcons dinner sign-up link',
+ 'Your FullMetal Falcons dinner sign-up link',
  '<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
   <h2 style="color:#111;">Hi {{parent_name}},</h2>
-  <p>Here is your personal link to sign up for Full-Metal Falcons team dinners:</p>
+  <p>Here is your personal link to sign up for FullMetal Falcons team dinners:</p>
   <p><a href="{{link_url}}" style="background:#1e3a8a;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Open my dinner page</a></p>
   <p style="color:#555;font-size:13px;">Or copy this URL: <br/><span style="word-break:break-all;">{{link_url}}</span></p>
   <p style="color:#888;font-size:12px;margin-top:32px;">Keep this link private — anyone with it can manage your sign-ups.</p>

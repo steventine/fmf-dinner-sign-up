@@ -23,7 +23,7 @@ export async function sendEmailViaResend(args: {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: args.from ?? "Falcons Dinners <dinners@fmf.tinefamily.com>",
+      from: args.from ?? "FullMetal Falcons Dinners <dinners@fmf.tinefamily.com>",
       to: [args.to],
       subject: args.subject,
       html: args.html,

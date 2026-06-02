@@ -11,7 +11,7 @@ ALTER TABLE public.email_templates
 UPDATE public.email_templates
 SET markdown_body = 'Hi {{parent_name}},
 
-Here is your personal link to sign up for Full-Metal Falcons team dinners:
+Here is your personal link to sign up for FullMetal Falcons team dinners:
 
 [Open my dinner page]({{link_url}})
 

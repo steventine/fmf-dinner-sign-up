@@ -22,7 +22,7 @@ import { getStatus, statusStyles } from "@/lib/household-status";
 
 export const Route = createFileRoute("/parent/$guid")({
   head: () => ({
-    meta: [{ title: "Your Dinner Sign-up — Full-Metal Falcons" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Your Dinner Sign-up — FullMetal Falcons" }, { name: "robots", content: "noindex" }],
   }),
   component: ParentPage,
 });

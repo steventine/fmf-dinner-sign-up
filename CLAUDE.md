@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FMF Dinner Sign-up is a full-stack web app for the Full-Metal Falcons robotics team. It manages a rotating dinner schedule where parent households sign up to provide meals at team meetings. Three access tiers: public calendar, parent sign-up (GUID link), and admin management.
+FMF Dinner Sign-up is a full-stack web app for the FullMetal Falcons robotics team. It manages a rotating dinner schedule where parent households sign up to provide meals at team meetings. Three access tiers: public calendar, parent sign-up (GUID link), and admin management.
 
 ## Commands
 
