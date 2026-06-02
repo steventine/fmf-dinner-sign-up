@@ -1,6 +1,6 @@
 # FMF Dinner Sign-up
 
-A web app for the Full-Metal Falcons robotics team that manages a rotating dinner schedule. Parent households sign up to provide meals at team meetings, track their progress toward seasonal dinner requirements, and request buy-outs when needed.
+A web app for the Full-Metal Falcons robotics team that manages a rotating dinner schedule. Parents sign up to provide meals at team meetings, track their progress toward seasonal dinner requirements, and request buy-outs when needed.
 
 ## What it does
 
