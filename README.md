@@ -91,3 +91,24 @@ supabase migration new <description>
 The app targets **Cloudflare Workers** via the Wrangler config in `wrangler.jsonc`. The server entry point is `src/server.ts`.
 
 The same environment variables from `.env` need to be set as secrets in your Cloudflare Workers environment.
+
+## Changing the Site URL
+
+When the app is deployed to a new URL (or when switching between local dev and production), update all of the following:
+
+### 1. Supabase — Authentication → URL Configuration
+
+In the Supabase dashboard for this project, under **Authentication → URL Configuration**:
+
+- **Site URL** — set to the new root URL (e.g. `https://dinner.example.com`)
+- **Redirect URLs** — add `<new-url>/**` to the allowlist (e.g. `https://dinner.example.com/**`)
+
+Supabase uses the Site URL as a fallback for email verification links when `emailRedirectTo` is not in the allowlist. If this isn't updated, admin sign-up confirmation emails will redirect to the old URL.
+
+For local dev, also add `http://localhost:8080/**` to the Redirect URLs list so verification emails work during development.
+
+### 2. Admin Settings → App URL
+
+In the app at `/admin/settings`, update the **App URL** field to the new root URL (no trailing slash).
+
+This value is stored in the `settings` table and is used to build the parent sign-up links embedded in invitation and reminder emails. If it's wrong, parents will receive links pointing to the old URL.
