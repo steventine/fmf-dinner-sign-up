@@ -59,7 +59,7 @@ function AdminLayout() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-6">
             <Link to="/admin/meetings" className="text-sm font-semibold tracking-tight">
-              Falcons Admin
+              FullMetal Falcons Admin
             </Link>
             <nav className="flex flex-wrap gap-1">
               {nav.map((n) => (

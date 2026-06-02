@@ -29,5 +29,5 @@ This is a friendly reminder that you''re signed up to bring **{{dinner}}** for {
 
 [View your dinner sign-ups]({{link_url}})
 
-Thanks for supporting the Falcons!'
+Thanks for supporting the FullMetal Falcons!'
 WHERE key = 'dinner_reminder';

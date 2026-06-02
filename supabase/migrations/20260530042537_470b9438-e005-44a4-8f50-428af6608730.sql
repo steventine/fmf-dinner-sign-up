@@ -12,7 +12,7 @@ VALUES (
     <p>This is a friendly reminder that you''re signed up to bring <strong>{{dinner}}</strong> for {{student_name}}''s meeting on <strong>{{meeting_date}}</strong>.</p>
     <p>You can view or update your sign-up here:</p>
     <p><a href="{{link_url}}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">View your dinner sign-ups</a></p>
-    <p style="color:#666;font-size:13px;margin-top:24px;">Thanks for supporting the Falcons!</p>
+    <p style="color:#666;font-size:13px;margin-top:24px;">Thanks for supporting the FullMetal Falcons!</p>
   </body>
 </html>',
   ARRAY['parent_name', 'student_name', 'meeting_date', 'dinner', 'link_url']
