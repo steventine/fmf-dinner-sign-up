@@ -4,6 +4,11 @@
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "vars": {
+    "SUPABASE_URL": "https://qpkmqrdmjfdmrherqmia.supabase.co",
+    "VITE_SUPABASE_URL": "https://qpkmqrdmjfdmrherqmia.supabase.co",
+    "VITE_SUPABASE_PROJECT_ID": "qpkmqrdmjfdmrherqmia"
+  },
   "triggers": {
     // Runs daily at 9am UTC — picks up any scheduled email templates that are due.
     "crons": ["0 9 * * *"]
