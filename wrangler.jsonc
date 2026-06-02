@@ -12,5 +12,14 @@
   "triggers": {
     // Runs daily at 9am UTC — picks up any scheduled email templates that are due.
     "crons": ["0 9 * * *"]
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true
+    }
   }
 }
