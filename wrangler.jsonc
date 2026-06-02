@@ -4,4 +4,8 @@
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "triggers": {
+    // Runs daily at 9am UTC — picks up any scheduled email templates that are due.
+    "crons": ["0 9 * * *"]
+  }
 }

@@ -23,11 +23,13 @@ function AdminSettings() {
 
   const [defReq, setDefReq] = useState("");
   const [price, setPrice] = useState("");
+  const [appUrl, setAppUrl] = useState("");
 
   useEffect(() => {
     if (!data) return;
     setDefReq(String(data.default_dinners_required));
     setPrice(String(data.buyout_price));
+    setAppUrl(data.app_url ?? "");
   }, [data]);
 
   const save = useMutation({
@@ -36,6 +38,7 @@ function AdminSettings() {
         data: {
           default_dinners_required: parseInt(defReq, 10),
           buyout_price: parseFloat(price),
+          app_url: appUrl,
         },
       }),
     onSuccess: () => {
@@ -60,6 +63,11 @@ function AdminSettings() {
         <div className="space-y-2">
           <Label htmlFor="bp">Buy-out price (USD)</Label>
           <Input id="bp" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="app-url">App URL</Label>
+          <Input id="app-url" type="url" placeholder="https://dinner.example.com" value={appUrl} onChange={(e) => setAppUrl(e.target.value)} />
+          <p className="text-xs text-muted-foreground">Used to build parent sign-up links in emails. No trailing slash.</p>
         </div>
         <div className="pt-2">
           <Button onClick={() => save.mutate()} disabled={save.isPending}>Save settings</Button>

@@ -2,7 +2,7 @@
 import { marked } from "marked";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-function markdownToEmailHtml(markdown: string): string {
+export function markdownToEmailHtml(markdown: string): string {
   const body = marked.parse(markdown) as string;
   return `<!doctype html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;line-height:1.5">${body}</body></html>`;
 }

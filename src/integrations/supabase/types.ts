@@ -90,34 +90,97 @@ export type Database = {
           },
         ]
       }
+      email_send_log: {
+        Row: {
+          id: string
+          template_key: string
+          parent_id: string
+          sent_at: string
+          triggered_by: string
+          status: string
+          error_message: string | null
+        }
+        Insert: {
+          id?: string
+          template_key: string
+          parent_id: string
+          sent_at?: string
+          triggered_by: string
+          status?: string
+          error_message?: string | null
+        }
+        Update: {
+          id?: string
+          template_key?: string
+          parent_id?: string
+          sent_at?: string
+          triggered_by?: string
+          status?: string
+          error_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_send_log_template_key_fkey"
+            columns: ["template_key"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "email_send_log_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
+          audience_type: string | null
           available_variables: string[]
           description: string
-          markdown_body: string
           key: string
+          markdown_body: string
           name: string
+          schedule_cron: string | null
+          schedule_enabled: boolean
+          schedule_last_run_at: string | null
+          schedule_next_run_at: string | null
           subject: string
+          template_type: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          audience_type?: string | null
           available_variables?: string[]
           description?: string
-          markdown_body: string
           key: string
+          markdown_body: string
           name: string
+          schedule_cron?: string | null
+          schedule_enabled?: boolean
+          schedule_last_run_at?: string | null
+          schedule_next_run_at?: string | null
           subject: string
+          template_type?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          audience_type?: string | null
           available_variables?: string[]
           description?: string
-          html_body?: string
           key?: string
+          markdown_body?: string
           name?: string
+          schedule_cron?: string | null
+          schedule_enabled?: boolean
+          schedule_last_run_at?: string | null
+          schedule_next_run_at?: string | null
           subject?: string
+          template_type?: string
           updated_at?: string
           updated_by?: string | null
         }
@@ -191,21 +254,30 @@ export type Database = {
       }
       settings: {
         Row: {
+          app_url: string
           buyout_price: number
           default_dinners_required: number
           id: number
+          season_end: string | null
+          season_start: string | null
           updated_at: string
         }
         Insert: {
+          app_url?: string
           buyout_price?: number
           default_dinners_required?: number
           id?: number
+          season_end?: string | null
+          season_start?: string | null
           updated_at?: string
         }
         Update: {
+          app_url?: string
           buyout_price?: number
           default_dinners_required?: number
           id?: number
+          season_end?: string | null
+          season_start?: string | null
           updated_at?: string
         }
         Relationships: []

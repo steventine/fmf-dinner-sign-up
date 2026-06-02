@@ -77,4 +77,13 @@ export default {
       return brandedErrorResponse();
     }
   },
+
+  async scheduled(_event: unknown, _env: unknown, _ctx: unknown) {
+    try {
+      const { runScheduledEmailHeartbeat } = await import("./lib/email-scheduler.server");
+      await runScheduledEmailHeartbeat();
+    } catch (error) {
+      console.error("Scheduled heartbeat failed:", error);
+    }
+  },
 };
