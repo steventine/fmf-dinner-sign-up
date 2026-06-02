@@ -6,8 +6,6 @@
   "main": "src/server.ts",
   "vars": {
     "SUPABASE_URL": "https://qpkmqrdmjfdmrherqmia.supabase.co",
-    "VITE_SUPABASE_URL": "https://qpkmqrdmjfdmrherqmia.supabase.co",
-    "VITE_SUPABASE_PROJECT_ID": "qpkmqrdmjfdmrherqmia"
   },
   "triggers": {
     // Runs daily at 9am UTC — picks up any scheduled email templates that are due.
