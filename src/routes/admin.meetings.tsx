@@ -36,6 +36,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/admin/meetings")({
   component: AdminMeetings,
@@ -437,7 +443,17 @@ function AdminMeetings() {
                     {m.signup ? (
                       <>
                         <span className="font-medium text-foreground">{m.signup.student?.name}</span>
-                        {" · "}signed up by {m.signup.parent?.name}
+                        {" · "}signed up by{" "}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default underline decoration-dotted">
+                                {m.signup.parent?.name}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{m.signup.parent?.email}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </>
                     ) : (
                       <span className={isUnfilled ? "text-amber-700 font-medium" : ""}>Available</span>
