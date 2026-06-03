@@ -80,8 +80,10 @@ export default {
 
   async scheduled(_event: unknown, _env: unknown, _ctx: unknown) {
     try {
-      const { runScheduledEmailHeartbeat } = await import("./lib/email-scheduler.server");
-      await runScheduledEmailHeartbeat();
+      const { runScheduledEmailHeartbeat, runMeetingReminderHeartbeat } = await import(
+        "./lib/email-scheduler.server"
+      );
+      await Promise.all([runScheduledEmailHeartbeat(), runMeetingReminderHeartbeat()]);
     } catch (error) {
       console.error("Scheduled heartbeat failed:", error);
     }

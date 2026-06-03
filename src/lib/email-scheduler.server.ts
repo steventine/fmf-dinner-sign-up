@@ -166,6 +166,98 @@ export function computeNextRunAt(cron: string, after: Date = new Date()): Date |
   }
 }
 
+export async function runMeetingReminderHeartbeat(): Promise<void> {
+  const { data: tpl } = await supabaseAdmin
+    .from("email_templates")
+    .select("subject, markdown_body, reminder_days_before")
+    .eq("key", "dinner_reminder")
+    .single();
+
+  if (!tpl?.reminder_days_before) return;
+
+  const { data: settings } = await supabaseAdmin
+    .from("settings")
+    .select("app_url")
+    .eq("id", 1)
+    .single();
+  const appUrl = settings?.app_url ?? "";
+
+  const today = new Date();
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
+  const todayStr = today.toISOString().slice(0, 10);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  // Filter by date on meetings first, then look up unreminded sign_ups for those meetings.
+  const { data: upcomingMeetings } = await supabaseAdmin
+    .from("meetings")
+    .select("id, date")
+    .gte("date", todayStr)
+    .lte("date", cutoffStr);
+
+  if (!upcomingMeetings?.length) return;
+
+  const meetingDateById = new Map(upcomingMeetings.map((m) => [m.id, m.date]));
+
+  const { data: signUps } = await supabaseAdmin
+    .from("sign_ups")
+    .select("id, meeting_id, dinner, parent_id, parents(name, email, unique_guid), students(name)")
+    .in("meeting_id", upcomingMeetings.map((m) => m.id))
+    .is("cancelled_at", null)
+    .is("reminded_at", null);
+
+  if (!signUps?.length) return;
+
+  for (const su of signUps) {
+    const parent = Array.isArray(su.parents) ? su.parents[0] : su.parents;
+    const student = Array.isArray(su.students) ? su.students[0] : su.students;
+    if (!parent || !student) continue;
+
+    const rawDate = meetingDateById.get(su.meeting_id);
+    if (!rawDate) continue;
+    const meetingDate = new Date(rawDate + "T12:00:00Z").toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+
+    const variables: Record<string, string> = {
+      parent_name: parent.name,
+      student_name: student.name,
+      meeting_date: meetingDate,
+      dinner: su.dinner ?? "",
+      link_url: `${appUrl}/parent/${parent.unique_guid}`,
+    };
+
+    const resolvedSubject = renderTemplateString(tpl.subject, variables);
+    const html = markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables));
+
+    let status: "sent" | "failed" = "sent";
+    let errorMessage: string | null = null;
+
+    try {
+      await sendEmailViaResend({ to: parent.email, subject: resolvedSubject, html });
+    } catch (e) {
+      status = "failed";
+      errorMessage = e instanceof Error ? e.message : String(e);
+    }
+
+    await Promise.all([
+      supabaseAdmin.from("email_send_log").insert({
+        template_key: "dinner_reminder",
+        parent_id: su.parent_id,
+        triggered_by: "schedule",
+        status,
+        error_message: errorMessage,
+      }),
+      supabaseAdmin
+        .from("sign_ups")
+        .update({ reminded_at: new Date().toISOString() })
+        .eq("id", su.id),
+    ]);
+  }
+}
+
 export async function runScheduledEmailHeartbeat(): Promise<void> {
   const now = new Date();
 

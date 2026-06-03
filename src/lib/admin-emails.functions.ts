@@ -25,7 +25,7 @@ export const adminListEmailTemplates = createServerFn({ method: "POST" }).handle
   const { data, error } = await supabaseAdmin
     .from("email_templates")
     .select(
-      "key, name, description, subject, markdown_body, available_variables, template_type, audience_type, schedule_enabled, schedule_cron, schedule_next_run_at, schedule_last_run_at, updated_at",
+      "key, name, description, subject, markdown_body, available_variables, template_type, audience_type, schedule_enabled, schedule_cron, schedule_next_run_at, schedule_last_run_at, reminder_days_before, updated_at",
     )
     .order("name");
   if (error) throw new Error(error.message);
@@ -231,6 +231,20 @@ export const adminGetSendHistory = createServerFn({ method: "POST" })
       .limit(50);
     if (error) throw new Error(error.message);
     return logs ?? [];
+  });
+
+export const adminUpdateReminderDays = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ days: z.number().int().min(1).max(30) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    await requireAdminUserId();
+    const { error } = await supabaseAdmin
+      .from("email_templates")
+      .update({ reminder_days_before: data.days })
+      .eq("key", "dinner_reminder");
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const adminSendTestEmail = createServerFn({ method: "POST" })

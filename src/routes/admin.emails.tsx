@@ -16,6 +16,7 @@ import {
   adminSendNow,
   adminGetSendHistory,
   adminSendTestEmail,
+  adminUpdateReminderDays,
   emailSampleVariables,
 } from "@/lib/admin-emails.functions";
 import { EmailTemplateEditor } from "@/components/EmailTemplateEditor";
@@ -152,15 +153,18 @@ function NewTemplateForm({
 function TransactionalEditor({ template }: { template: Template }) {
   const update = useServerFn(adminUpdateEmailTemplate);
   const sendTest = useServerFn(adminSendTestEmail);
+  const updateReminderDays = useServerFn(adminUpdateReminderDays);
   const qc = useQueryClient();
 
   const [subject, setSubject] = useState(template.subject);
   const [markdownBody, setMarkdownBody] = useState(template.markdown_body);
   const [testEmail, setTestEmail] = useState("");
+  const [reminderDays, setReminderDays] = useState(String(template.reminder_days_before ?? 3));
 
   useEffect(() => {
     setSubject(template.subject);
     setMarkdownBody(template.markdown_body);
+    setReminderDays(String(template.reminder_days_before ?? 3));
   }, [template.key]);
 
   useEffect(() => {
@@ -172,10 +176,17 @@ function TransactionalEditor({ template }: { template: Template }) {
   }, []);
 
   const isDirty = subject !== template.subject || markdownBody !== template.markdown_body;
+  const isReminderDirty = reminderDays !== String(template.reminder_days_before ?? 3);
 
   const save = useMutation({
     mutationFn: () => update({ data: { key: template.key, subject, markdown_body: markdownBody } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Template saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveReminder = useMutation({
+    mutationFn: () => updateReminderDays({ data: { days: parseInt(reminderDays, 10) } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Reminder settings saved"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -186,37 +197,69 @@ function TransactionalEditor({ template }: { template: Template }) {
   });
 
   return (
-    <Card className="space-y-4 p-6">
-      <div>
-        <h2 className="text-lg font-semibold">{template.name}</h2>
-        {template.description && (
-          <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
-        )}
-        <Badge variant="outline" className="mt-2 text-xs">Transactional</Badge>
-      </div>
-
-      <EmailTemplateEditor
-        subject={subject}
-        onSubjectChange={setSubject}
-        markdownBody={markdownBody}
-        onMarkdownBodyChange={setMarkdownBody}
-        availableVariables={template.available_variables}
-        sampleVariables={emailSampleVariables}
-      />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => save.mutate()} disabled={!isDirty || save.isPending}>
-          {save.isPending ? "Saving…" : "Save"}
-        </Button>
-        <div className="ml-auto flex items-center gap-2">
-          <Input type="email" placeholder="you@example.com" value={testEmail}
-            onChange={(e) => setTestEmail(e.target.value)} className="w-52" />
-          <Button variant="outline" onClick={() => test.mutate()} disabled={test.isPending || !testEmail}>
-            {test.isPending ? "Sending…" : "Send test"}
-          </Button>
+    <div className="space-y-4">
+      <Card className="space-y-4 p-6">
+        <div>
+          <h2 className="text-lg font-semibold">{template.name}</h2>
+          {template.description && (
+            <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
+          )}
+          <Badge variant="outline" className="mt-2 text-xs">Transactional</Badge>
         </div>
-      </div>
-    </Card>
+
+        <EmailTemplateEditor
+          subject={subject}
+          onSubjectChange={setSubject}
+          markdownBody={markdownBody}
+          onMarkdownBodyChange={setMarkdownBody}
+          availableVariables={template.available_variables}
+          sampleVariables={emailSampleVariables}
+        />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => save.mutate()} disabled={!isDirty || save.isPending}>
+            {save.isPending ? "Saving…" : "Save"}
+          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            <Input type="email" placeholder="you@example.com" value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)} className="w-52" />
+            <Button variant="outline" onClick={() => test.mutate()} disabled={test.isPending || !testEmail}>
+              {test.isPending ? "Sending…" : "Send test"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {template.key === "dinner_reminder" && (
+        <Card className="space-y-4 p-6">
+          <h3 className="font-semibold">Reminder settings</h3>
+          <div className="flex items-end gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="reminder-days">Days before meeting</Label>
+              <Input
+                id="reminder-days"
+                type="number"
+                min={1}
+                max={30}
+                className="w-24"
+                value={reminderDays}
+                onChange={(e) => setReminderDays(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Parents are emailed this many days before their signed-up meeting.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => saveReminder.mutate()}
+            disabled={!isReminderDirty || saveReminder.isPending}
+          >
+            {saveReminder.isPending ? "Saving…" : "Save reminder settings"}
+          </Button>
+        </Card>
+      )}
+    </div>
   );
 }
 
