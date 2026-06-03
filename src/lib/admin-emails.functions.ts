@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireAdminUserId } from "./dinners.server";
-import { renderAndSendTemplate } from "./email.server";
+import { renderAndSendTemplate, renderTemplateString } from "./email.server";
 import {
   computeNextRunAt,
   resolveAudienceCount,
@@ -245,6 +245,75 @@ export const adminUpdateReminderDays = createServerFn({ method: "POST" })
       .eq("key", "dinner_reminder");
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ asOf: z.string().date() }).parse(input))
+  .handler(async ({ data }) => {
+    await requireAdminUserId();
+
+    const { data: tpl } = await supabaseAdmin
+      .from("email_templates")
+      .select("subject, markdown_body, reminder_days_before")
+      .eq("key", "dinner_reminder")
+      .single();
+
+    if (!tpl?.reminder_days_before) return { reminders: [], reason: "no_days_configured" as const };
+
+    const today = new Date(data.asOf + "T12:00:00Z");
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
+    const todayStr = today.toISOString().slice(0, 10);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    const { data: upcomingMeetings } = await supabaseAdmin
+      .from("meetings")
+      .select("id, date")
+      .gte("date", todayStr)
+      .lte("date", cutoffStr);
+
+    if (!upcomingMeetings?.length) return { reminders: [], reason: "no_meetings" as const };
+
+    const meetingDateById = new Map(upcomingMeetings.map((m) => [m.id, m.date]));
+
+    const { data: signUps } = await supabaseAdmin
+      .from("sign_ups")
+      .select("id, meeting_id, dinner, parents(name, email, unique_guid), students(name)")
+      .in("meeting_id", upcomingMeetings.map((m) => m.id))
+      .is("cancelled_at", null)
+      .is("reminded_at", null);
+
+    if (!signUps?.length) return { reminders: [], reason: "none_pending" as const };
+
+    const { data: settings } = await supabaseAdmin
+      .from("settings")
+      .select("app_url")
+      .eq("id", 1)
+      .single();
+    const appUrl = settings?.app_url ?? "";
+
+    const reminders = signUps.flatMap((su) => {
+      const parent = Array.isArray(su.parents) ? su.parents[0] : su.parents;
+      const student = Array.isArray(su.students) ? su.students[0] : su.students;
+      if (!parent || !student) return [];
+      const rawDate = meetingDateById.get(su.meeting_id);
+      if (!rawDate) return [];
+      const meetingDate = new Date(rawDate + "T12:00:00Z").toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+      const variables: Record<string, string> = {
+        parent_name: parent.name,
+        student_name: student.name,
+        meeting_date: meetingDate,
+        dinner: su.dinner ?? "",
+        link_url: `${appUrl}/parent/${parent.unique_guid}`,
+      };
+      return [{ parentName: parent.name, parentEmail: parent.email, meetingDate, dinner: su.dinner ?? "", subject: renderTemplateString(tpl.subject, variables) }];
+    });
+
+    return { reminders, reason: null };
   });
 
 export const adminSendTestEmail = createServerFn({ method: "POST" })

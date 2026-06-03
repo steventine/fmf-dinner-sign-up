@@ -17,6 +17,7 @@ import {
   adminGetSendHistory,
   adminSendTestEmail,
   adminUpdateReminderDays,
+  adminPreviewReminderHeartbeat,
   emailSampleVariables,
 } from "@/lib/admin-emails.functions";
 import { EmailTemplateEditor } from "@/components/EmailTemplateEditor";
@@ -154,12 +155,14 @@ function TransactionalEditor({ template }: { template: Template }) {
   const update = useServerFn(adminUpdateEmailTemplate);
   const sendTest = useServerFn(adminSendTestEmail);
   const updateReminderDays = useServerFn(adminUpdateReminderDays);
+  const previewHeartbeat = useServerFn(adminPreviewReminderHeartbeat);
   const qc = useQueryClient();
 
   const [subject, setSubject] = useState(template.subject);
   const [markdownBody, setMarkdownBody] = useState(template.markdown_body);
   const [testEmail, setTestEmail] = useState("");
   const [reminderDays, setReminderDays] = useState(String(template.reminder_days_before ?? 3));
+  const [previewDate, setPreviewDate] = useState(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     setSubject(template.subject);
@@ -187,6 +190,11 @@ function TransactionalEditor({ template }: { template: Template }) {
   const saveReminder = useMutation({
     mutationFn: () => updateReminderDays({ data: { days: parseInt(reminderDays, 10) } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Reminder settings saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const preview = useMutation({
+    mutationFn: () => previewHeartbeat({ data: { asOf: previewDate } }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -257,6 +265,63 @@ function TransactionalEditor({ template }: { template: Template }) {
           >
             {saveReminder.isPending ? "Saving…" : "Save reminder settings"}
           </Button>
+        </Card>
+      )}
+
+      {template.key === "dinner_reminder" && (
+        <Card className="space-y-4 p-6">
+          <h3 className="font-semibold">Preview upcoming reminders</h3>
+          <p className="text-sm text-muted-foreground">
+            Shows which sign-ups would receive a reminder if the heartbeat ran on the selected date. No emails are sent.
+          </p>
+          <div className="flex items-end gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="preview-date">As of date</Label>
+              <Input
+                id="preview-date"
+                type="date"
+                value={previewDate}
+                onChange={(e) => setPreviewDate(e.target.value)}
+                className="w-44"
+              />
+            </div>
+            <Button variant="outline" onClick={() => preview.mutate()} disabled={preview.isPending}>
+              {preview.isPending ? "Loading…" : "Preview"}
+            </Button>
+          </div>
+
+          {preview.data && (
+            preview.data.reminders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {preview.data.reason === "no_days_configured" && "No reminder window configured — set days above first."}
+                {preview.data.reason === "no_meetings" && "No meetings fall within the reminder window for this date."}
+                {preview.data.reason === "none_pending" && "All sign-ups in the window have already been reminded."}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="pb-2 pr-4 font-medium">Parent</th>
+                      <th className="pb-2 pr-4 font-medium">Email</th>
+                      <th className="pb-2 pr-4 font-medium">Meeting</th>
+                      <th className="pb-2 font-medium">Dinner</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {preview.data.reminders.map((r, i) => (
+                      <tr key={i}>
+                        <td className="py-2 pr-4">{r.parentName}</td>
+                        <td className="py-2 pr-4 text-muted-foreground">{r.parentEmail}</td>
+                        <td className="py-2 pr-4">{r.meetingDate}</td>
+                        <td className="py-2">{r.dinner || <span className="text-muted-foreground">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
         </Card>
       )}
     </div>
