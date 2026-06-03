@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getRequestHeader } from "@tanstack/react-start/server";
 import { renderAndSendTemplate } from "./email.server";
 import { getActiveSeasonYear, getHouseholdProgress } from "./dinners.server";
 
@@ -44,10 +43,12 @@ export const requestParentLink = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (parent) {
-      const origin =
-        getRequestHeader("origin") ||
-        (getRequestHeader("host") ? `https://${getRequestHeader("host")}` : "");
-      const url = `${origin}/parent/${parent.unique_guid}`;
+      const { data: settings } = await supabaseAdmin
+        .from("settings")
+        .select("app_url")
+        .eq("id", 1)
+        .single();
+      const url = `${settings?.app_url ?? ""}/parent/${parent.unique_guid}`;
       try {
         await renderAndSendTemplate({
           key: "parent_link",

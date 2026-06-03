@@ -128,10 +128,12 @@ export const adminResendParentLink = createServerFn({ method: "POST" })
       .eq("id", data.parentId)
       .single();
     if (error) throw new Error(error.message);
-    const origin =
-      getRequestHeader("origin") ||
-      (getRequestHeader("host") ? `https://${getRequestHeader("host")}` : "");
-    const url = `${origin}/parent/${p.unique_guid}`;
+    const { data: settings } = await supabaseAdmin
+      .from("settings")
+      .select("app_url")
+      .eq("id", 1)
+      .single();
+    const url = `${settings?.app_url ?? ""}/parent/${p.unique_guid}`;
     await renderAndSendTemplate({
       key: "parent_link",
       to: p.email,

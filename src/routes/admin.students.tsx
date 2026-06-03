@@ -125,6 +125,7 @@ function AdminStudents() {
             <StudentRow
               key={s.id}
               student={s}
+              appUrl={settings?.app_url ?? ""}
               onUpdate={async (patch) => {
                 try {
                   await update({ data: { id: s.id, ...patch } });
@@ -192,6 +193,7 @@ type Student = Awaited<ReturnType<typeof import("@/lib/admin.functions").adminLi
 
 function StudentRow({
   student,
+  appUrl,
   onUpdate,
   onDelete,
   onAddParent,
@@ -200,6 +202,7 @@ function StudentRow({
   onResend,
 }: {
   student: Student;
+  appUrl: string;
   onUpdate: (p: { name?: string; dinners_required?: number | null }) => void;
   onDelete: () => void;
   onAddParent: (p: { name: string; email: string }) => void;
@@ -245,6 +248,7 @@ function StudentRow({
             <ParentRow
               key={p.id}
               parent={p}
+              appUrl={appUrl}
               onSave={(patch) => onEditParent(p.id, patch)}
               onRemove={() => onRemoveParent(p.id)}
               onResend={() => onResend(p.id)}
@@ -285,21 +289,20 @@ function StudentRow({
 
 function ParentRow({
   parent,
+  appUrl,
   onSave,
   onRemove,
   onResend,
 }: {
   parent: NonNullable<Student["parents"]>[number];
+  appUrl: string;
   onSave: (p: { name?: string; email?: string }) => void;
   onRemove: () => void;
   onResend: () => void;
 }) {
   const [name, setName] = useState(parent.name);
   const [email, setEmail] = useState(parent.email);
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/parent/${parent.unique_guid}`
-      : `/parent/${parent.unique_guid}`;
+  const url = `${appUrl}/parent/${parent.unique_guid}`;
 
   return (
     <div className="space-y-2 rounded-md border p-3">
