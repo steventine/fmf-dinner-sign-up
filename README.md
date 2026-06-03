@@ -92,6 +92,38 @@ The app targets **Cloudflare Workers** via the Wrangler config in `wrangler.json
 
 The same environment variables from `.env` need to be set as secrets in your Cloudflare Workers environment.
 
+## Google OAuth setup
+
+Admin sign-in supports Google OAuth via Supabase. This requires a one-time setup across Google Cloud and the Supabase dashboard.
+
+### 1. Create a Google OAuth app
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
+2. Navigate to **APIs & Services → Credentials** and click **Create credentials → OAuth client ID**.
+3. Set the application type to **Web application**.
+4. Under **Authorized redirect URIs**, add:
+   ```
+   https://<project-ref>.supabase.co/auth/v1/callback
+   ```
+   (Replace `<project-ref>` with your Supabase project ref — the subdomain of your Supabase URL.)
+5. Click **Create**. Note the **Client ID** and **Client Secret**.
+
+### 2. Enable Google in Supabase
+
+1. In the Supabase dashboard, go to **Authentication → Providers → Google**.
+2. Toggle it **enabled**.
+3. Paste in the **Client ID** and **Client Secret** from step 1.
+4. Save.
+
+### 3. Add redirect URLs
+
+In the Supabase dashboard under **Authentication → URL Configuration → Redirect URLs**, add:
+
+- `http://localhost:8080/**` (local dev)
+- `https://<your-production-url>/**` (production)
+
+After completing these steps, the **Continue with Google** button on the `/login` page will work.
+
 ## Changing the Site URL
 
 When the app is deployed to a new URL (or when switching between local dev and production), update all of the following:

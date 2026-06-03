@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useServerFn } from "@tanstack/react-start";
 import { adminClaimIfFirst, adminIsAdmin } from "@/lib/admin-read.functions";
 import { Card } from "@/components/ui/card";
@@ -70,14 +69,15 @@ function LoginPage() {
 
   async function onGoogle() {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/login",
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/login" },
     });
-    if (result.error) {
+    if (error) {
       setBusy(false);
-      const msg = result.error.message || "Google sign-in failed";
-      toast.error(msg.includes("not invited") ? "This email is not invited." : msg);
+      toast.error(error.message || "Google sign-in failed");
     }
+    // On success Supabase redirects the browser — busy stays true intentionally
   }
 
   return (
