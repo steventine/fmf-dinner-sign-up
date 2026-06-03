@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import {
   adminUpdateParent,
   adminDeleteParent,
 } from "@/lib/admin.functions";
-import { adminResendParentLink } from "@/lib/admin-read.functions";
+import { adminGetSettings, adminResendParentLink } from "@/lib/admin-read.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +33,16 @@ function AdminStudents() {
   const removeParent = useServerFn(adminDeleteParent);
   const resend = useServerFn(adminResendParentLink);
 
+  const getSettings = useServerFn(adminGetSettings);
+
   const { data: students, isLoading } = useQuery({
     queryKey: ["admin-students"],
     queryFn: () => list({}),
+  });
+
+  const { data: settings } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => getSettings({}),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-students"] });
@@ -43,12 +50,19 @@ function AdminStudents() {
   const [newName, setNewName] = useState("");
   const [newRequired, setNewRequired] = useState<string>("");
 
+  useEffect(() => {
+    if (settings?.default_dinners_required != null && newRequired === "") {
+      setNewRequired(settings.default_dinners_required.toString());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
   const createStudent = useMutation({
     mutationFn: (input: { name: string; dinners_required: number | null }) => create({ data: input }),
     onSuccess: () => {
       invalidate();
       setNewName("");
-      setNewRequired("");
+      setNewRequired(settings?.default_dinners_required?.toString() ?? "");
       toast.success("Student added");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -93,7 +107,6 @@ function AdminStudents() {
               id="sr"
               type="number"
               min={0}
-              placeholder="default"
               value={newRequired}
               onChange={(e) => setNewRequired(e.target.value)}
             />
