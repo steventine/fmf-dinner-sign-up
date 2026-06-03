@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getRequestHeader } from "@tanstack/react-start/server";
 import { renderAndSendTemplate } from "./email.server";
 import { getActiveSeasonYear, requireAdminUserId } from "./dinners.server";
 
@@ -42,10 +41,12 @@ export const adminSendDinnerReminder = createServerFn({ method: "POST" })
       throw new Error("No active sign-up for this meeting.");
     }
 
-    const origin =
-      getRequestHeader("origin") ||
-      (getRequestHeader("host") ? `https://${getRequestHeader("host")}` : "");
-    const link_url = `${origin}/parent/${signup.parent.unique_guid}`;
+    const { data: settings } = await supabaseAdmin
+      .from("settings")
+      .select("app_url")
+      .eq("id", 1)
+      .single();
+    const link_url = `${settings?.app_url ?? ""}/parent/${signup.parent.unique_guid}`;
 
     await renderAndSendTemplate({
       key: "dinner_reminder",
