@@ -21,6 +21,7 @@ import { Route as AdminMeetingsRouteImport } from './routes/admin.meetings'
 import { Route as AdminInvitesRouteImport } from './routes/admin.invites'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminBuyoutsRouteImport } from './routes/admin.buyouts'
+import { Route as AdminBanquetRouteImport } from './routes/admin.banquet'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -82,11 +83,17 @@ const AdminBuyoutsRoute = AdminBuyoutsRouteImport.update({
   path: '/buyouts',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBanquetRoute = AdminBanquetRouteImport.update({
+  id: '/banquet',
+  path: '/banquet',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/admin/banquet'
     | '/admin/buyouts'
     | '/admin/emails'
     | '/admin/invites'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/admin/banquet'
     | '/admin/buyouts'
     | '/admin/emails'
     | '/admin/invites'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/admin/banquet'
     | '/admin/buyouts'
     | '/admin/emails'
     | '/admin/invites'
@@ -262,10 +274,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBuyoutsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/banquet': {
+      id: '/admin/banquet'
+      path: '/banquet'
+      fullPath: '/admin/banquet'
+      preLoaderRoute: typeof AdminBanquetRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminBanquetRoute: typeof AdminBanquetRoute
   AdminBuyoutsRoute: typeof AdminBuyoutsRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminInvitesRoute: typeof AdminInvitesRoute
@@ -277,6 +297,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBanquetRoute: AdminBanquetRoute,
   AdminBuyoutsRoute: AdminBuyoutsRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminInvitesRoute: AdminInvitesRoute,

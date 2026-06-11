@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { MeetingRow } from "@/lib/calendar";
+import { parseLocalDate, type MeetingRow } from "@/lib/calendar";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,6 +33,59 @@ export const Route = createFileRoute("/")({
   }),
   component: PublicCalendarPage,
 });
+
+type BanquetSummary = NonNullable<Awaited<ReturnType<typeof getPublicSchedule>>["banquet"]>;
+
+function BanquetSummaryCard({ banquet }: { banquet: BanquetSummary }) {
+  const date = parseLocalDate(banquet.date).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  return (
+    <Card className="space-y-3 border-primary/30 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+            End-of-year banquet
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">
+            {date}
+            {banquet.time && ` · ${banquet.time}`}
+          </h2>
+          {banquet.location && <p className="text-sm text-muted-foreground">{banquet.location}</p>}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {banquet.totals.rsvpHouseholds} household{banquet.totals.rsvpHouseholds === 1 ? "" : "s"}{" "}
+          / {banquet.totals.guests} guest{banquet.totals.guests === 1 ? "" : "s"} attending
+        </div>
+      </div>
+      {banquet.categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {banquet.categories.map((c) => {
+            const full = c.claimed >= c.capacity;
+            return (
+              <span
+                key={c.name}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  full
+                    ? "bg-muted text-muted-foreground"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                }`}
+              >
+                {c.name} {c.claimed}/{c.capacity}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Use your personal parent link to RSVP and pick what you'll bring — sign in above if you need
+        it re-sent.
+      </p>
+    </Card>
+  );
+}
 
 function PublicCalendarPage() {
   const fetchSchedule = useServerFn(getPublicSchedule);
@@ -64,13 +117,18 @@ function PublicCalendarPage() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl items-start justify-between gap-4 px-4 py-8 sm:py-12">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">FullMetal Falcons Robotics</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Team Dinner Sign-up</h1>
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+              FullMetal Falcons Robotics
+            </p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Team Dinner Sign-up
+            </h1>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base my-[9px]">
-              Please bring your dinner to Xavier at 6pm. Dinner should include a main entree; a side or dessert is nice
-              but optional. Some possible main entrees include Illiano’s pizza, Big Y sandwiches or pizza, and homemade
-              dishes (grilled chicken, pasta, hot dogs, tacos, BBQ). You should ask your student to check Slack to see
-              how many people have signed up for the meeting, and it is suggested that you bring a little extra as there
+              Please bring your dinner to Xavier at 6pm. Dinner should include a main entree; a side
+              or dessert is nice but optional. Some possible main entrees include Illiano’s pizza,
+              Big Y sandwiches or pizza, and homemade dishes (grilled chicken, pasta, hot dogs,
+              tacos, BBQ). You should ask your student to check Slack to see how many people have
+              signed up for the meeting, and it is suggested that you bring a little extra as there
               will be people who forget to sign up.
             </p>
           </div>
@@ -82,8 +140,8 @@ function PublicCalendarPage() {
               <DialogHeader>
                 <DialogTitle>Get your sign-up link</DialogTitle>
                 <DialogDescription>
-                  Enter the email you gave the team — we'll email you a private link to sign up or manage your family's
-                  meals.
+                  Enter the email you gave the team — we'll email you a private link to sign up or
+                  manage your family's meals.
                 </DialogDescription>
               </DialogHeader>
               <form
@@ -122,6 +180,7 @@ function PublicCalendarPage() {
               <TabsTrigger value="students">Student summary</TabsTrigger>
             </TabsList>
             <TabsContent value="calendar" className="space-y-6">
+              {data?.banquet && <BanquetSummaryCard banquet={data.banquet} />}
               <MeetingCalendar meetings={(data?.meetings ?? []) as MeetingRow[]} />
             </TabsContent>
             <TabsContent value="students" className="space-y-6">

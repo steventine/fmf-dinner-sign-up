@@ -61,6 +61,8 @@ const ONE_OFF_VARIABLES = ["parent_name", "link_url", "dinners_remaining"];
 const AUDIENCE_LABELS: Record<string, string> = {
   all_parents: "All parents",
   parents_below_quota: "Parents below dinner quota",
+  banquet_no_rsvp: "Banquet: not yet RSVPed",
+  banquet_attending: "Banquet: RSVPed attending",
   single_parent: "Single parent (on-demand only)",
 };
 
@@ -102,8 +104,7 @@ function NewTemplateForm({
   const [markdownBody, setMarkdownBody] = useState("");
 
   const save = useMutation({
-    mutationFn: () =>
-      create({ data: { name, description, subject, markdown_body: markdownBody } }),
+    mutationFn: () => create({ data: { name, description, subject, markdown_body: markdownBody } }),
     onSuccess: ({ key }) => {
       qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
       toast.success("Template created");
@@ -119,11 +120,20 @@ function NewTemplateForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="new-name">Name</Label>
-          <Input id="new-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Season welcome" />
+          <Input
+            id="new-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Season welcome"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="new-desc">Description (optional)</Label>
-          <Input id="new-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Input
+            id="new-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
       </div>
 
@@ -143,7 +153,9 @@ function NewTemplateForm({
         >
           {save.isPending ? "Creating…" : "Create template"}
         </Button>
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
     </Card>
   );
@@ -175,7 +187,9 @@ function TransactionalEditor({ template }: { template: Template }) {
     supabase.auth.getUser().then(({ data }) => {
       if (!cancelled && data.user?.email && !testEmail) setTestEmail(data.user.email);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isDirty = subject !== template.subject || markdownBody !== template.markdown_body;
@@ -183,13 +197,19 @@ function TransactionalEditor({ template }: { template: Template }) {
 
   const save = useMutation({
     mutationFn: () => update({ data: { key: template.key, subject, markdown_body: markdownBody } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Template saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Template saved");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const saveReminder = useMutation({
     mutationFn: () => updateReminderDays({ data: { days: parseInt(reminderDays, 10) } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Reminder settings saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Reminder settings saved");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -212,7 +232,9 @@ function TransactionalEditor({ template }: { template: Template }) {
           {template.description && (
             <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
           )}
-          <Badge variant="outline" className="mt-2 text-xs">Transactional</Badge>
+          <Badge variant="outline" className="mt-2 text-xs">
+            Transactional
+          </Badge>
         </div>
 
         <EmailTemplateEditor
@@ -229,9 +251,18 @@ function TransactionalEditor({ template }: { template: Template }) {
             {save.isPending ? "Saving…" : "Save"}
           </Button>
           <div className="ml-auto flex items-center gap-2">
-            <Input type="email" placeholder="you@example.com" value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)} className="w-52" />
-            <Button variant="outline" onClick={() => test.mutate()} disabled={test.isPending || !testEmail}>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="w-52"
+            />
+            <Button
+              variant="outline"
+              onClick={() => test.mutate()}
+              disabled={test.isPending || !testEmail}
+            >
               {test.isPending ? "Sending…" : "Send test"}
             </Button>
           </div>
@@ -272,7 +303,8 @@ function TransactionalEditor({ template }: { template: Template }) {
         <Card className="space-y-4 p-6">
           <h3 className="font-semibold">Preview upcoming reminders</h3>
           <p className="text-sm text-muted-foreground">
-            Shows which sign-ups would receive a reminder if the heartbeat ran on the selected date. No emails are sent.
+            Shows which sign-ups would receive a reminder if the heartbeat ran on the selected date.
+            No emails are sent.
           </p>
           <div className="flex items-end gap-3">
             <div className="space-y-2">
@@ -290,12 +322,15 @@ function TransactionalEditor({ template }: { template: Template }) {
             </Button>
           </div>
 
-          {preview.data && (
-            preview.data.reminders.length === 0 ? (
+          {preview.data &&
+            (preview.data.reminders.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {preview.data.reason === "no_days_configured" && "No reminder window configured — set days above first."}
-                {preview.data.reason === "no_meetings" && "No meetings fall within the reminder window for this date."}
-                {preview.data.reason === "none_pending" && "All sign-ups in the window have already been reminded."}
+                {preview.data.reason === "no_days_configured" &&
+                  "No reminder window configured — set days above first."}
+                {preview.data.reason === "no_meetings" &&
+                  "No meetings fall within the reminder window for this date."}
+                {preview.data.reason === "none_pending" &&
+                  "All sign-ups in the window have already been reminded."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -314,14 +349,15 @@ function TransactionalEditor({ template }: { template: Template }) {
                         <td className="py-2 pr-4">{r.parentName}</td>
                         <td className="py-2 pr-4 text-muted-foreground">{r.parentEmail}</td>
                         <td className="py-2 pr-4">{r.meetingDate}</td>
-                        <td className="py-2">{r.dinner || <span className="text-muted-foreground">—</span>}</td>
+                        <td className="py-2">
+                          {r.dinner || <span className="text-muted-foreground">—</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )
-          )}
+            ))}
         </Card>
       )}
     </div>
@@ -387,8 +423,13 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
   });
 
   const saveInfo = useMutation({
-    mutationFn: () => updateInfo({ data: { key: template.key, name: editName, description: editDescription } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Saved"); setIsEditingMeta(false); },
+    mutationFn: () =>
+      updateInfo({ data: { key: template.key, name: editName, description: editDescription } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Saved");
+      setIsEditingMeta(false);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -397,11 +438,15 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
   const isScheduleDirty =
     scheduleEnabled !== template.schedule_enabled ||
     (scheduleEnabled &&
-      (currentCron !== template.schedule_cron || scheduleAudience !== (template.audience_type ?? "")));
+      (currentCron !== template.schedule_cron ||
+        scheduleAudience !== (template.audience_type ?? "")));
 
   const save = useMutation({
     mutationFn: () => update({ data: { key: template.key, subject, markdown_body: markdownBody } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Template saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Template saved");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -412,16 +457,29 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
           key: template.key,
           enabled: scheduleEnabled,
           cron: scheduleEnabled ? currentCron : undefined,
-          audience_type: scheduleEnabled ? (scheduleAudience as "all_parents" | "parents_below_quota") : undefined,
+          audience_type: scheduleEnabled
+            ? (scheduleAudience as
+                | "all_parents"
+                | "parents_below_quota"
+                | "banquet_no_rsvp"
+                | "banquet_attending")
+            : undefined,
         },
       }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Schedule saved"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Schedule saved");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const del = useMutation({
     mutationFn: () => deleteTemplate({ data: { key: template.key } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-email-templates"] }); toast.success("Template deleted"); onDeleted(); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
+      toast.success("Template deleted");
+      onDeleted();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -445,7 +503,12 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
       sendNow({
         data: {
           key: template.key,
-          audience_type: sendAudience as "all_parents" | "parents_below_quota" | "single_parent",
+          audience_type: sendAudience as
+            | "all_parents"
+            | "parents_below_quota"
+            | "banquet_no_rsvp"
+            | "banquet_attending"
+            | "single_parent",
           parent_id: sendAudience === "single_parent" ? selectedParentId : undefined,
         },
       }),
@@ -454,7 +517,10 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
       toast.success(`Sent ${sent}${failed ? `, ${failed} failed` : ""}`);
       setShowConfirm(false);
     },
-    onError: (e: Error) => { toast.error(e.message); setShowConfirm(false); },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setShowConfirm(false);
+    },
   });
 
   const canSend = sendAudience !== "single_parent" || !!selectedParentId;
@@ -479,10 +545,22 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
                   placeholder="Description (optional)"
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => saveInfo.mutate()} disabled={!editName || saveInfo.isPending}>
+                  <Button
+                    size="sm"
+                    onClick={() => saveInfo.mutate()}
+                    disabled={!editName || saveInfo.isPending}
+                  >
                     {saveInfo.isPending ? "Saving…" : "Save"}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => { setIsEditingMeta(false); setEditName(template.name); setEditDescription(template.description); }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditingMeta(false);
+                      setEditName(template.name);
+                      setEditDescription(template.description);
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -494,7 +572,9 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
                   {template.description && (
                     <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
                   )}
-                  <Badge variant="secondary" className="mt-2 text-xs">One-off</Badge>
+                  <Badge variant="secondary" className="mt-2 text-xs">
+                    One-off
+                  </Badge>
                 </div>
                 <button
                   type="button"
@@ -553,7 +633,15 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all_parents">{AUDIENCE_LABELS.all_parents}</SelectItem>
-                    <SelectItem value="parents_below_quota">{AUDIENCE_LABELS.parents_below_quota}</SelectItem>
+                    <SelectItem value="parents_below_quota">
+                      {AUDIENCE_LABELS.parents_below_quota}
+                    </SelectItem>
+                    <SelectItem value="banquet_no_rsvp">
+                      {AUDIENCE_LABELS.banquet_no_rsvp}
+                    </SelectItem>
+                    <SelectItem value="banquet_attending">
+                      {AUDIENCE_LABELS.banquet_attending}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -574,13 +662,18 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
               {scheduleFreq === "weekly" && (
                 <div className="space-y-1">
                   <Label>Day of week</Label>
-                  <Select value={String(scheduleDow)} onValueChange={(v) => setScheduleDow(parseInt(v))}>
+                  <Select
+                    value={String(scheduleDow)}
+                    onValueChange={(v) => setScheduleDow(parseInt(v))}
+                  >
                     <SelectTrigger className="w-36">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {DOW_LABELS.map((d, i) => (
-                        <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                        <SelectItem key={i} value={String(i)}>
+                          {d}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -590,13 +683,18 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
               {scheduleFreq === "monthly" && (
                 <div className="space-y-1">
                   <Label>Day of month</Label>
-                  <Select value={String(scheduleDom)} onValueChange={(v) => setScheduleDom(parseInt(v))}>
+                  <Select
+                    value={String(scheduleDom)}
+                    onValueChange={(v) => setScheduleDom(parseInt(v))}
+                  >
                     <SelectTrigger className="w-24">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                        <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                        <SelectItem key={d} value={String(d)}>
+                          {d}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -634,13 +732,21 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label htmlFor="send-audience">Audience</Label>
-              <Select value={sendAudience} onValueChange={(v) => { setSendAudience(v); setSelectedParentId(""); }}>
+              <Select
+                value={sendAudience}
+                onValueChange={(v) => {
+                  setSendAudience(v);
+                  setSelectedParentId("");
+                }}
+              >
                 <SelectTrigger id="send-audience" className="w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(AUDIENCE_LABELS).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                    <SelectItem key={v} value={v}>
+                      {l}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -695,7 +801,10 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
                         <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
                         <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
                         <td className="py-2">
-                          <Badge variant={log.status === "sent" ? "secondary" : "destructive"} className="text-xs">
+                          <Badge
+                            variant={log.status === "sent" ? "secondary" : "destructive"}
+                            className="text-xs"
+                          >
                             {log.status}
                           </Badge>
                         </td>
@@ -793,7 +902,10 @@ function AdminEmails() {
               <li key={t.key}>
                 <button
                   type="button"
-                  onClick={() => { setSelectedKey(t.key); setIsCreating(false); }}
+                  onClick={() => {
+                    setSelectedKey(t.key);
+                    setIsCreating(false);
+                  }}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
                     selectedKey === t.key && !isCreating ? "bg-accent font-medium" : ""
                   }`}
@@ -812,7 +924,10 @@ function AdminEmails() {
             </p>
             <button
               type="button"
-              onClick={() => { setIsCreating(true); setSelectedKey(null); }}
+              onClick={() => {
+                setIsCreating(true);
+                setSelectedKey(null);
+              }}
               className="rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-accent"
             >
               + New
@@ -823,7 +938,10 @@ function AdminEmails() {
               <li key={t.key}>
                 <button
                   type="button"
-                  onClick={() => { setSelectedKey(t.key); setIsCreating(false); }}
+                  onClick={() => {
+                    setSelectedKey(t.key);
+                    setIsCreating(false);
+                  }}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
                     selectedKey === t.key && !isCreating ? "bg-accent font-medium" : ""
                   }`}
@@ -836,9 +954,7 @@ function AdminEmails() {
               </li>
             ))}
             {oneOff.length === 0 && !isCreating && (
-              <li className="px-3 py-2 text-xs text-muted-foreground">
-                No one-off templates yet.
-              </li>
+              <li className="px-3 py-2 text-xs text-muted-foreground">No one-off templates yet.</li>
             )}
           </ul>
         </Card>

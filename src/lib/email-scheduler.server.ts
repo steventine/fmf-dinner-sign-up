@@ -2,6 +2,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { markdownToEmailHtml, renderTemplateString, sendEmailViaResend } from "./email.server";
 import { currentSeasonYear } from "./dinners.server";
+import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
 type ParentRecipient = {
   id: string;
@@ -11,7 +12,10 @@ type ParentRecipient = {
   dinners_remaining?: number;
 };
 
-async function resolveAudience(audienceType: string, parentId?: string): Promise<ParentRecipient[]> {
+async function resolveAudience(
+  audienceType: string,
+  parentId?: string,
+): Promise<ParentRecipient[]> {
   if (audienceType === "single_parent") {
     if (!parentId) return [];
     const { data } = await supabaseAdmin
@@ -67,6 +71,32 @@ async function resolveAudience(audienceType: string, parentId?: string): Promise
       unique_guid: p.unique_guid,
       dinners_remaining: remainingMap.get(p.student_id) ?? 0,
     }));
+  }
+
+  if (audienceType === "banquet_no_rsvp" || audienceType === "banquet_attending") {
+    const banquet = await getActiveBanquet();
+    if (!banquet) return [];
+
+    const { data: rsvps } = await supabaseAdmin
+      .from("banquet_rsvps")
+      .select("student_id, attending")
+      .eq("banquet_id", banquet.id);
+
+    const respondedStudents = new Set((rsvps ?? []).map((r) => r.student_id));
+    const attendingStudents = new Set(
+      (rsvps ?? []).filter((r) => r.attending).map((r) => r.student_id),
+    );
+
+    const { data: parents } = await supabaseAdmin
+      .from("parents")
+      .select("id, name, email, unique_guid, student_id")
+      .order("name");
+
+    return (parents ?? []).filter((p) =>
+      audienceType === "banquet_no_rsvp"
+        ? !respondedStudents.has(p.student_id)
+        : attendingStudents.has(p.student_id),
+    );
   }
 
   return [];
@@ -202,7 +232,10 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
   const { data: signUps } = await supabaseAdmin
     .from("sign_ups")
     .select("id, meeting_id, dinner, parent_id, parents(name, email, unique_guid), students(name)")
-    .in("meeting_id", upcomingMeetings.map((m) => m.id))
+    .in(
+      "meeting_id",
+      upcomingMeetings.map((m) => m.id),
+    )
     .is("cancelled_at", null)
     .is("reminded_at", null);
 
@@ -254,6 +287,97 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
         .from("sign_ups")
         .update({ reminded_at: new Date().toISOString() })
         .eq("id", su.id),
+    ]);
+  }
+}
+
+// Reminds attending households what they signed up to bring, X days before the banquet.
+// Editing an RSVP clears reminded_at, so an updated reminder re-sends.
+export async function runBanquetReminderHeartbeat(): Promise<void> {
+  const { data: tpl } = await supabaseAdmin
+    .from("email_templates")
+    .select("subject, markdown_body, reminder_days_before")
+    .eq("key", "banquet_reminder")
+    .single();
+
+  if (!tpl?.reminder_days_before) return;
+
+  const banquet = await getActiveBanquet();
+  if (!banquet) return;
+
+  const today = new Date();
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
+  const todayStr = today.toISOString().slice(0, 10);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  if (banquet.date < todayStr || banquet.date > cutoffStr) return;
+
+  const { data: rsvps } = await supabaseAdmin
+    .from("banquet_rsvps")
+    .select(
+      "id, guest_count, parent_id, parents(name, email, unique_guid), banquet_item_signups(item_description, banquet_item_categories(name))",
+    )
+    .eq("banquet_id", banquet.id)
+    .eq("attending", true)
+    .is("reminded_at", null);
+
+  if (!rsvps?.length) return;
+
+  const { data: settings } = await supabaseAdmin
+    .from("settings")
+    .select("app_url")
+    .eq("id", 1)
+    .single();
+  const appUrl = settings?.app_url ?? "";
+  const banquetDate = formatBanquetDate(banquet.date);
+
+  for (const rsvp of rsvps) {
+    const parent = Array.isArray(rsvp.parents) ? rsvp.parents[0] : rsvp.parents;
+    if (!parent) continue;
+
+    const items = (rsvp.banquet_item_signups ?? [])
+      .map((s) => {
+        const cat = Array.isArray(s.banquet_item_categories)
+          ? s.banquet_item_categories[0]
+          : s.banquet_item_categories;
+        const name = cat?.name ?? "Item";
+        return `- **${name}**${s.item_description ? ` — ${s.item_description}` : ""}`;
+      })
+      .join("\n");
+
+    const variables: Record<string, string> = {
+      parent_name: parent.name,
+      banquet_date: banquetDate,
+      guest_count: String(rsvp.guest_count),
+      items,
+      link_url: `${appUrl}/parent/${parent.unique_guid}`,
+    };
+
+    const resolvedSubject = renderTemplateString(tpl.subject, variables);
+    const html = markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables));
+
+    let status: "sent" | "failed" = "sent";
+    let errorMessage: string | null = null;
+
+    try {
+      await sendEmailViaResend({ to: parent.email, subject: resolvedSubject, html });
+    } catch (e) {
+      status = "failed";
+      errorMessage = e instanceof Error ? e.message : String(e);
+    }
+
+    await Promise.all([
+      supabaseAdmin.from("email_send_log").insert({
+        template_key: "banquet_reminder",
+        parent_id: rsvp.parent_id,
+        triggered_by: "schedule",
+        status,
+        error_message: errorMessage,
+      }),
+      supabaseAdmin
+        .from("banquet_rsvps")
+        .update({ reminded_at: new Date().toISOString() })
+        .eq("id", rsvp.id),
     ]);
   }
 }

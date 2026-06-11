@@ -12,7 +12,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => ((m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry)),
+      (m) => (m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry),
     );
   }
   return serverEntryPromise;
@@ -80,10 +80,16 @@ export default {
 
   async scheduled(_event: unknown, _env: unknown, _ctx: unknown) {
     try {
-      const { runScheduledEmailHeartbeat, runMeetingReminderHeartbeat } = await import(
-        "./lib/email-scheduler.server"
-      );
-      await Promise.all([runScheduledEmailHeartbeat(), runMeetingReminderHeartbeat()]);
+      const {
+        runScheduledEmailHeartbeat,
+        runMeetingReminderHeartbeat,
+        runBanquetReminderHeartbeat,
+      } = await import("./lib/email-scheduler.server");
+      await Promise.all([
+        runScheduledEmailHeartbeat(),
+        runMeetingReminderHeartbeat(),
+        runBanquetReminderHeartbeat(),
+      ]);
     } catch (error) {
       console.error("Scheduled heartbeat failed:", error);
     }

@@ -3,11 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireAdminUserId } from "./dinners.server";
 import { renderAndSendTemplate, renderTemplateString } from "./email.server";
-import {
-  computeNextRunAt,
-  resolveAudienceCount,
-  sendToAudience,
-} from "./email-scheduler.server";
+import { computeNextRunAt, resolveAudienceCount, sendToAudience } from "./email-scheduler.server";
 
 const SAMPLE_VARIABLES: Record<string, string> = {
   parent_name: "Sample Parent",
@@ -120,7 +116,12 @@ export const adminUpdateEmailTemplateInfo = createServerFn({ method: "POST" })
     const adminId = await requireAdminUserId();
     const { error } = await supabaseAdmin
       .from("email_templates")
-      .update({ name: data.name, description: data.description, updated_at: new Date().toISOString(), updated_by: adminId })
+      .update({
+        name: data.name,
+        description: data.description,
+        updated_at: new Date().toISOString(),
+        updated_by: adminId,
+      })
       .eq("key", data.key);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -136,10 +137,7 @@ export const adminDeleteEmailTemplate = createServerFn({ method: "POST" })
       .eq("key", data.key)
       .maybeSingle();
     if (!tpl || tpl.template_type !== "one_off") throw new Error("Cannot delete this template");
-    const { error } = await supabaseAdmin
-      .from("email_templates")
-      .delete()
-      .eq("key", data.key);
+    const { error } = await supabaseAdmin.from("email_templates").delete().eq("key", data.key);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -151,14 +149,16 @@ export const adminUpdateEmailSchedule = createServerFn({ method: "POST" })
         key: z.string().min(1),
         enabled: z.boolean(),
         cron: z.string().max(100).optional(),
-        audience_type: z.enum(["all_parents", "parents_below_quota"]).optional(),
+        audience_type: z
+          .enum(["all_parents", "parents_below_quota", "banquet_no_rsvp", "banquet_attending"])
+          .optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const nextRunAt =
-      data.enabled && data.cron ? computeNextRunAt(data.cron)?.toISOString() ?? null : null;
+      data.enabled && data.cron ? (computeNextRunAt(data.cron)?.toISOString() ?? null) : null;
     const { error } = await supabaseAdmin
       .from("email_templates")
       .update({
@@ -173,9 +173,7 @@ export const adminUpdateEmailSchedule = createServerFn({ method: "POST" })
   });
 
 export const adminResolveAudienceCount = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ audience_type: z.string().min(1) }).parse(input),
-  )
+  .inputValidator((input) => z.object({ audience_type: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const count = await resolveAudienceCount(data.audience_type);
@@ -187,7 +185,13 @@ export const adminSendNow = createServerFn({ method: "POST" })
     z
       .object({
         key: z.string().min(1),
-        audience_type: z.enum(["all_parents", "parents_below_quota", "single_parent"]),
+        audience_type: z.enum([
+          "all_parents",
+          "parents_below_quota",
+          "banquet_no_rsvp",
+          "banquet_attending",
+          "single_parent",
+        ]),
         parent_id: z.string().uuid().optional(),
       })
       .parse(input),
@@ -234,9 +238,7 @@ export const adminGetSendHistory = createServerFn({ method: "POST" })
   });
 
 export const adminUpdateReminderDays = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ days: z.number().int().min(1).max(30) }).parse(input),
-  )
+  .inputValidator((input) => z.object({ days: z.number().int().min(1).max(30) }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const { error } = await supabaseAdmin
@@ -279,7 +281,10 @@ export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
     const { data: signUps } = await supabaseAdmin
       .from("sign_ups")
       .select("id, meeting_id, dinner, parents(name, email, unique_guid), students(name)")
-      .in("meeting_id", upcomingMeetings.map((m) => m.id))
+      .in(
+        "meeting_id",
+        upcomingMeetings.map((m) => m.id),
+      )
       .is("cancelled_at", null)
       .is("reminded_at", null);
 
@@ -310,7 +315,15 @@ export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
         dinner: su.dinner ?? "",
         link_url: `${appUrl}/parent/${parent.unique_guid}`,
       };
-      return [{ parentName: parent.name, parentEmail: parent.email, meetingDate, dinner: su.dinner ?? "", subject: renderTemplateString(tpl.subject, variables) }];
+      return [
+        {
+          parentName: parent.name,
+          parentEmail: parent.email,
+          meetingDate,
+          dinner: su.dinner ?? "",
+          subject: renderTemplateString(tpl.subject, variables),
+        },
+      ];
     });
 
     return { reminders, reason: null };

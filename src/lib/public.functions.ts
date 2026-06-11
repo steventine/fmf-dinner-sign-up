@@ -3,37 +3,37 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderAndSendTemplate } from "./email.server";
 import { getActiveSeasonYear, getHouseholdProgress } from "./dinners.server";
+import { getActiveBanquet, getBanquetSummary } from "./banquet.server";
 
-export const getPublicSchedule = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { data: meetings, error } = await supabaseAdmin
-      .from("v_meeting_status")
-      .select("*")
-      .order("date", { ascending: true });
-    if (error) throw new Error(error.message);
+export const getPublicSchedule = createServerFn({ method: "GET" }).handler(async () => {
+  const { data: meetings, error } = await supabaseAdmin
+    .from("v_meeting_status")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw new Error(error.message);
 
-    const { data: students, error: stErr } = await supabaseAdmin
-      .from("students")
-      .select("id, name, dinners_required")
-      .order("name");
-    if (stErr) throw new Error(stErr.message);
+  const { data: students, error: stErr } = await supabaseAdmin
+    .from("students")
+    .select("id, name, dinners_required")
+    .order("name");
+  if (stErr) throw new Error(stErr.message);
 
-    const season = await getActiveSeasonYear();
-    const households = await Promise.all(
-      (students ?? []).map(async (s) => ({
-        ...s,
-        progress: await getHouseholdProgress(s.id, season),
-      })),
-    );
+  const season = await getActiveSeasonYear();
+  const households = await Promise.all(
+    (students ?? []).map(async (s) => ({
+      ...s,
+      progress: await getHouseholdProgress(s.id, season),
+    })),
+  );
 
-    return { meetings: meetings ?? [], households, season };
-  },
-);
+  const activeBanquet = await getActiveBanquet();
+  const banquet = activeBanquet ? await getBanquetSummary(activeBanquet) : null;
+
+  return { meetings: meetings ?? [], households, season, banquet };
+});
 
 export const requestParentLink = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ email: z.string().email().max(255) }).parse(input),
-  )
+  .inputValidator((input) => z.object({ email: z.string().email().max(255) }).parse(input))
   .handler(async ({ data }) => {
     // Silent success regardless of result (no enumeration).
     const { data: parent } = await supabaseAdmin

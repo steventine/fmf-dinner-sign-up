@@ -29,6 +29,175 @@ export type Database = {
         }
         Relationships: []
       }
+      banquet_item_categories: {
+        Row: {
+          banquet_id: string
+          capacity: number
+          description: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          banquet_id: string
+          capacity: number
+          description?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          banquet_id?: string
+          capacity?: number
+          description?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banquet_item_categories_banquet_id_fkey"
+            columns: ["banquet_id"]
+            isOneToOne: false
+            referencedRelation: "banquets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banquet_item_signups: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          item_description: string | null
+          rsvp_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          item_description?: string | null
+          rsvp_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          item_description?: string | null
+          rsvp_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banquet_item_signups_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "banquet_item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banquet_item_signups_rsvp_id_fkey"
+            columns: ["rsvp_id"]
+            isOneToOne: false
+            referencedRelation: "banquet_rsvps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banquet_rsvps: {
+        Row: {
+          attending: boolean
+          banquet_id: string
+          created_at: string
+          guest_count: number
+          id: string
+          parent_id: string
+          reminded_at: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          attending: boolean
+          banquet_id: string
+          created_at?: string
+          guest_count?: number
+          id?: string
+          parent_id: string
+          reminded_at?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          attending?: boolean
+          banquet_id?: string
+          created_at?: string
+          guest_count?: number
+          id?: string
+          parent_id?: string
+          reminded_at?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banquet_rsvps_banquet_id_fkey"
+            columns: ["banquet_id"]
+            isOneToOne: false
+            referencedRelation: "banquets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banquet_rsvps_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banquet_rsvps_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banquet_rsvps_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "v_meeting_status"
+            referencedColumns: ["student_id"]
+          },
+        ]
+      }
+      banquets: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          location: string | null
+          notes: string | null
+          season_year: number
+          time: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          season_year: number
+          time?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          season_year?: number
+          time?: string | null
+        }
+        Relationships: []
+      }
       buy_outs: {
         Row: {
           amount: number
@@ -143,6 +312,7 @@ export type Database = {
           key: string
           markdown_body: string
           name: string
+          reminder_days_before: number | null
           schedule_cron: string | null
           schedule_enabled: boolean
           schedule_last_run_at: string | null
@@ -159,6 +329,7 @@ export type Database = {
           key: string
           markdown_body: string
           name: string
+          reminder_days_before?: number | null
           schedule_cron?: string | null
           schedule_enabled?: boolean
           schedule_last_run_at?: string | null
@@ -175,6 +346,7 @@ export type Database = {
           key?: string
           markdown_body?: string
           name?: string
+          reminder_days_before?: number | null
           schedule_cron?: string | null
           schedule_enabled?: boolean
           schedule_last_run_at?: string | null
@@ -290,6 +462,7 @@ export type Database = {
           id: string
           meeting_id: string
           parent_id: string
+          reminded_at: string | null
           student_id: string
         }
         Insert: {
@@ -299,6 +472,7 @@ export type Database = {
           id?: string
           meeting_id: string
           parent_id: string
+          reminded_at?: string | null
           student_id: string
         }
         Update: {
@@ -308,6 +482,7 @@ export type Database = {
           id?: string
           meeting_id?: string
           parent_id?: string
+          reminded_at?: string | null
           student_id?: string
         }
         Relationships: [
@@ -406,6 +581,14 @@ export type Database = {
       }
     }
     Functions: {
+      claim_banquet_item: {
+        Args: {
+          _category_id: string
+          _item_description: string | null
+          _rsvp_id: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { cancelSignUp, getParentContext, requestBuyOut, signUpForMeeting } from "@/lib/parent.functions";
+import {
+  cancelSignUp,
+  getParentContext,
+  requestBuyOut,
+  signUpForMeeting,
+} from "@/lib/parent.functions";
 import { MeetingCalendar, type MySignUp } from "@/components/MeetingCalendar";
+import { BanquetCard } from "@/components/BanquetCard";
 import type { MeetingRow } from "@/lib/calendar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +28,10 @@ import { getStatus, statusStyles } from "@/lib/household-status";
 
 export const Route = createFileRoute("/parent/$guid")({
   head: () => ({
-    meta: [{ title: "Your Dinner Sign-up — FullMetal Falcons" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Your Dinner Sign-up — FullMetal Falcons" },
+      { name: "robots", content: "noindex" },
+    ],
   }),
   component: ParentPage,
 });
@@ -81,7 +90,9 @@ function ParentPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your dashboard…</div>
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+        Loading your dashboard…
+      </div>
     );
   }
 
@@ -91,7 +102,8 @@ function ParentPage() {
         <Card className="max-w-md p-8 text-center">
           <h1 className="text-lg font-semibold text-foreground">This link isn't valid</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            The link you used isn't recognized. If you think this is a mistake, ask the team to resend you a fresh link.
+            The link you used isn't recognized. If you think this is a mistake, ask the team to
+            resend you a fresh link.
           </p>
         </Card>
       </div>
@@ -108,7 +120,9 @@ function ParentPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-5xl px-4 py-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Welcome, {parent.name}</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+            Welcome, {parent.name}
+          </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {household?.name ?? "Your household"}
           </h1>
@@ -123,8 +137,8 @@ function ParentPage() {
                 Your family has provided {progress.provided} of {progress.required} required dinners
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Includes dinner sign-ups (including upcoming ones) plus approved buy-outs (money has been received
-                by the team).
+                Includes dinner sign-ups (including upcoming ones) plus approved buy-outs (money has
+                been received by the team).
               </p>
             </div>
             <span
@@ -162,6 +176,8 @@ function ParentPage() {
           )}
         </Card>
 
+        <BanquetCard guid={guid} />
+
         <MeetingCalendar
           meetings={meetings as MeetingRow[]}
           parent={{
@@ -179,7 +195,9 @@ function ParentPage() {
       <DinnerDialog
         meetingId={dinnerMeetingId}
         onOpenChange={(open) => !open && setDinnerMeetingId(null)}
-        onConfirm={(dinner) => dinnerMeetingId && signUpMut.mutate({ meetingId: dinnerMeetingId, dinner })}
+        onConfirm={(dinner) =>
+          dinnerMeetingId && signUpMut.mutate({ meetingId: dinnerMeetingId, dinner })
+        }
         loading={signUpMut.isPending}
       />
 
@@ -223,9 +241,9 @@ function BuyOutDialog({
         <DialogHeader>
           <DialogTitle>Request a Buy-Out</DialogTitle>
           <DialogDescription>
-            Choose how many dinners you'd like to buy out. Please bring cash or a check payable to 'Xavier High School'
-            to Mr. Gammons at the next robotics meeting. Your buy-out will be in a pending state until we receive the
-            actual payment.
+            Choose how many dinners you'd like to buy out. Please bring cash or a check payable to
+            'Xavier High School' to Mr. Gammons at the next robotics meeting. Your buy-out will be
+            in a pending state until we receive the actual payment.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -298,7 +316,10 @@ function DinnerDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(dinner.trim())} disabled={loading || dinner.trim().length === 0}>
+          <Button
+            onClick={() => onConfirm(dinner.trim())}
+            disabled={loading || dinner.trim().length === 0}
+          >
             {loading ? "Signing up…" : "Confirm sign-up"}
           </Button>
         </DialogFooter>
