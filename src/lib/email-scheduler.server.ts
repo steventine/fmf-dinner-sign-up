@@ -119,6 +119,15 @@ export async function sendToAudience(args: {
   const { templateKey, audienceType, subject, markdownBody, appUrl, parentId, triggeredBy } = args;
   const recipients = await resolveAudience(audienceType, parentId);
 
+  // Banquet variables are available to every one-off template (empty when no banquet exists).
+  const banquet = await getActiveBanquet();
+  const banquetVariables: Record<string, string> = {
+    banquet_date: banquet ? formatBanquetDate(banquet.date) : "",
+    banquet_time: banquet?.time ?? "",
+    banquet_location: banquet?.location ?? "",
+    banquet_notes: banquet?.notes ?? "",
+  };
+
   let sent = 0;
   let failed = 0;
 
@@ -126,6 +135,7 @@ export async function sendToAudience(args: {
     const variables: Record<string, string> = {
       parent_name: parent.name,
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
+      ...banquetVariables,
       ...(parent.dinners_remaining !== undefined
         ? { dinners_remaining: String(parent.dinners_remaining) }
         : {}),
@@ -348,6 +358,9 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
     const variables: Record<string, string> = {
       parent_name: parent.name,
       banquet_date: banquetDate,
+      banquet_time: banquet.time ?? "",
+      banquet_location: banquet.location ?? "",
+      banquet_notes: banquet.notes ?? "",
       guest_count: String(rsvp.guest_count),
       items,
       link_url: `${appUrl}/parent/${parent.unique_guid}`,

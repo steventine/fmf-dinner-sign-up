@@ -18,6 +18,7 @@ import {
   adminSendTestEmail,
   adminUpdateReminderDays,
   adminPreviewReminderHeartbeat,
+  adminPreviewBanquetReminderHeartbeat,
   emailSampleVariables,
 } from "@/lib/admin-emails.functions";
 import { EmailTemplateEditor } from "@/components/EmailTemplateEditor";
@@ -55,8 +56,17 @@ export const Route = createFileRoute("/admin/emails")({
 type Template = Awaited<ReturnType<typeof adminListEmailTemplates>>[number];
 
 // Variables the campaign audience resolver always provides for one-off sends.
-// dinners_remaining is only populated for the parents_below_quota audience but is always listed.
-const ONE_OFF_VARIABLES = ["parent_name", "link_url", "dinners_remaining"];
+// dinners_remaining is only populated for the parents_below_quota audience, and the
+// banquet_* variables are empty when no banquet exists, but all are always listed.
+const ONE_OFF_VARIABLES = [
+  "parent_name",
+  "link_url",
+  "dinners_remaining",
+  "banquet_date",
+  "banquet_time",
+  "banquet_location",
+  "banquet_notes",
+];
 
 const AUDIENCE_LABELS: Record<string, string> = {
   all_parents: "All parents",
@@ -168,6 +178,9 @@ function TransactionalEditor({ template }: { template: Template }) {
   const sendTest = useServerFn(adminSendTestEmail);
   const updateReminderDays = useServerFn(adminUpdateReminderDays);
   const previewHeartbeat = useServerFn(adminPreviewReminderHeartbeat);
+  const previewBanquetHeartbeat = useServerFn(adminPreviewBanquetReminderHeartbeat);
+  const isReminderTemplate =
+    template.key === "dinner_reminder" || template.key === "banquet_reminder";
   const qc = useQueryClient();
 
   const [subject, setSubject] = useState(template.subject);
@@ -205,7 +218,13 @@ function TransactionalEditor({ template }: { template: Template }) {
   });
 
   const saveReminder = useMutation({
-    mutationFn: () => updateReminderDays({ data: { days: parseInt(reminderDays, 10) } }),
+    mutationFn: () =>
+      updateReminderDays({
+        data: {
+          key: template.key as "dinner_reminder" | "banquet_reminder",
+          days: parseInt(reminderDays, 10),
+        },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-email-templates"] });
       toast.success("Reminder settings saved");
@@ -215,6 +234,11 @@ function TransactionalEditor({ template }: { template: Template }) {
 
   const preview = useMutation({
     mutationFn: () => previewHeartbeat({ data: { asOf: previewDate } }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const banquetPreview = useMutation({
+    mutationFn: () => previewBanquetHeartbeat({ data: { asOf: previewDate } }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -269,12 +293,14 @@ function TransactionalEditor({ template }: { template: Template }) {
         </div>
       </Card>
 
-      {template.key === "dinner_reminder" && (
+      {isReminderTemplate && (
         <Card className="space-y-4 p-6">
           <h3 className="font-semibold">Reminder settings</h3>
           <div className="flex items-end gap-3">
             <div className="space-y-2">
-              <Label htmlFor="reminder-days">Days before meeting</Label>
+              <Label htmlFor="reminder-days">
+                Days before {template.key === "banquet_reminder" ? "banquet" : "meeting"}
+              </Label>
               <Input
                 id="reminder-days"
                 type="number"
@@ -285,7 +311,9 @@ function TransactionalEditor({ template }: { template: Template }) {
                 onChange={(e) => setReminderDays(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Parents are emailed this many days before their signed-up meeting.
+                {template.key === "banquet_reminder"
+                  ? "Attending households are emailed this many days before the banquet."
+                  : "Parents are emailed this many days before their signed-up meeting."}
               </p>
             </div>
           </div>
@@ -351,6 +379,76 @@ function TransactionalEditor({ template }: { template: Template }) {
                         <td className="py-2 pr-4">{r.meetingDate}</td>
                         <td className="py-2">
                           {r.dinner || <span className="text-muted-foreground">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+        </Card>
+      )}
+
+      {template.key === "banquet_reminder" && (
+        <Card className="space-y-4 p-6">
+          <h3 className="font-semibold">Preview upcoming reminders</h3>
+          <p className="text-sm text-muted-foreground">
+            Shows which attending households would receive a reminder if the heartbeat ran on the
+            selected date. No emails are sent.
+          </p>
+          <div className="flex items-end gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="banquet-preview-date">As of date</Label>
+              <Input
+                id="banquet-preview-date"
+                type="date"
+                value={previewDate}
+                onChange={(e) => setPreviewDate(e.target.value)}
+                className="w-44"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => banquetPreview.mutate()}
+              disabled={banquetPreview.isPending}
+            >
+              {banquetPreview.isPending ? "Loading…" : "Preview"}
+            </Button>
+          </div>
+
+          {banquetPreview.data &&
+            (banquetPreview.data.reminders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {banquetPreview.data.reason === "no_days_configured" &&
+                  "No reminder window configured — set days above first."}
+                {banquetPreview.data.reason === "no_banquet" &&
+                  "There is no banquet for the active season."}
+                {banquetPreview.data.reason === "not_in_window" &&
+                  "The banquet does not fall within the reminder window for this date."}
+                {banquetPreview.data.reason === "none_pending" &&
+                  "All attending households have already been reminded."}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="pb-2 pr-4 font-medium">Parent</th>
+                      <th className="pb-2 pr-4 font-medium">Email</th>
+                      <th className="pb-2 pr-4 font-medium">Banquet</th>
+                      <th className="pb-2 pr-4 font-medium">Guests</th>
+                      <th className="pb-2 font-medium">Bringing</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {banquetPreview.data.reminders.map((r, i) => (
+                      <tr key={i}>
+                        <td className="py-2 pr-4">{r.parentName}</td>
+                        <td className="py-2 pr-4 text-muted-foreground">{r.parentEmail}</td>
+                        <td className="py-2 pr-4">{r.banquetDate}</td>
+                        <td className="py-2 pr-4">{r.guestCount}</td>
+                        <td className="py-2">
+                          {r.items || <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
                     ))}

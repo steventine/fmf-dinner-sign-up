@@ -210,7 +210,7 @@ export const adminSendBanquetInvites = createServerFn({ method: "POST" })
     await requireAdminUserId();
     const { data: banquet, error: bErr } = await supabaseAdmin
       .from("banquets")
-      .select("id, date")
+      .select("id, date, time, location, notes")
       .eq("id", data.banquetId)
       .single();
     if (bErr) throw new Error(bErr.message);
@@ -250,6 +250,9 @@ export const adminSendBanquetInvites = createServerFn({ method: "POST" })
           variables: {
             parent_name: parent.name,
             banquet_date: banquetDate,
+            banquet_time: banquet.time ?? "",
+            banquet_location: banquet.location ?? "",
+            banquet_notes: banquet.notes ?? "",
             link_url: `${appUrl}/parent/${parent.unique_guid}`,
           },
         });

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireAdminUserId } from "./dinners.server";
 import { renderAndSendTemplate, renderTemplateString } from "./email.server";
 import { computeNextRunAt, resolveAudienceCount, sendToAudience } from "./email-scheduler.server";
+import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
 const SAMPLE_VARIABLES: Record<string, string> = {
   parent_name: "Sample Parent",
@@ -12,6 +13,12 @@ const SAMPLE_VARIABLES: Record<string, string> = {
   student_name: "Sample Student",
   dinner: "Lasagna",
   dinners_remaining: "2",
+  banquet_date: "Saturday, June 13",
+  banquet_time: "6:00 PM",
+  banquet_location: "Xavier High School cafeteria",
+  banquet_notes: "Doors open at 5:30 for setup volunteers.",
+  guest_count: "3",
+  items: "- **Entree** — Lasagna\n- **Desserts** — Brownies",
 };
 
 export { SAMPLE_VARIABLES as emailSampleVariables };
@@ -238,13 +245,20 @@ export const adminGetSendHistory = createServerFn({ method: "POST" })
   });
 
 export const adminUpdateReminderDays = createServerFn({ method: "POST" })
-  .inputValidator((input) => z.object({ days: z.number().int().min(1).max(30) }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        key: z.enum(["dinner_reminder", "banquet_reminder"]),
+        days: z.number().int().min(1).max(30),
+      })
+      .parse(input),
+  )
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const { error } = await supabaseAdmin
       .from("email_templates")
       .update({ reminder_days_before: data.days })
-      .eq("key", "dinner_reminder");
+      .eq("key", data.key);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -322,6 +336,69 @@ export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
           meetingDate,
           dinner: su.dinner ?? "",
           subject: renderTemplateString(tpl.subject, variables),
+        },
+      ];
+    });
+
+    return { reminders, reason: null };
+  });
+
+export const adminPreviewBanquetReminderHeartbeat = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ asOf: z.string().date() }).parse(input))
+  .handler(async ({ data }) => {
+    await requireAdminUserId();
+
+    const { data: tpl } = await supabaseAdmin
+      .from("email_templates")
+      .select("reminder_days_before")
+      .eq("key", "banquet_reminder")
+      .single();
+
+    if (!tpl?.reminder_days_before) return { reminders: [], reason: "no_days_configured" as const };
+
+    const banquet = await getActiveBanquet();
+    if (!banquet) return { reminders: [], reason: "no_banquet" as const };
+
+    const today = new Date(data.asOf + "T12:00:00Z");
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
+    const todayStr = today.toISOString().slice(0, 10);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    if (banquet.date < todayStr || banquet.date > cutoffStr)
+      return { reminders: [], reason: "not_in_window" as const };
+
+    const { data: rsvps } = await supabaseAdmin
+      .from("banquet_rsvps")
+      .select(
+        "guest_count, parents(name, email), banquet_item_signups(item_description, banquet_item_categories(name))",
+      )
+      .eq("banquet_id", banquet.id)
+      .eq("attending", true)
+      .is("reminded_at", null);
+
+    if (!rsvps?.length) return { reminders: [], reason: "none_pending" as const };
+
+    const banquetDate = formatBanquetDate(banquet.date);
+
+    const reminders = rsvps.flatMap((rsvp) => {
+      const parent = Array.isArray(rsvp.parents) ? rsvp.parents[0] : rsvp.parents;
+      if (!parent) return [];
+      const items = (rsvp.banquet_item_signups ?? [])
+        .map((s) => {
+          const cat = Array.isArray(s.banquet_item_categories)
+            ? s.banquet_item_categories[0]
+            : s.banquet_item_categories;
+          const name = cat?.name ?? "Item";
+          return s.item_description ? `${name} (${s.item_description})` : name;
+        })
+        .join(", ");
+      return [
+        {
+          parentName: parent.name,
+          parentEmail: parent.email,
+          banquetDate,
+          guestCount: rsvp.guest_count,
+          items,
         },
       ];
     });
