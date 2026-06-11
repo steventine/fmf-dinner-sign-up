@@ -79,6 +79,23 @@ function BanquetSummaryCard({ banquet }: { banquet: BanquetSummary }) {
           })}
         </div>
       )}
+      {banquet.categories.some((c) => c.items.length > 0) && (
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">What families are bringing so far:</p>
+          <ul className="space-y-0.5 text-sm text-muted-foreground">
+            {banquet.categories
+              .filter((c) => c.items.length > 0)
+              .map((c) => (
+                <li key={c.name}>
+                  <span className="font-medium text-foreground">{c.name}:</span>{" "}
+                  {c.items
+                    .map((i) => (i.description ? `${i.household} (${i.description})` : i.household))
+                    .join(", ")}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         Use your personal parent link to RSVP and pick what you'll bring — sign in above if you need
         it re-sent.
@@ -174,19 +191,21 @@ function PublicCalendarPage() {
         {isLoading ? (
           <Card className="p-8 text-center text-muted-foreground">Loading schedule…</Card>
         ) : (
-          <Tabs defaultValue="calendar" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="students">Student summary</TabsTrigger>
-            </TabsList>
-            <TabsContent value="calendar" className="space-y-6">
-              {data?.banquet && <BanquetSummaryCard banquet={data.banquet} />}
-              <MeetingCalendar meetings={(data?.meetings ?? []) as MeetingRow[]} />
-            </TabsContent>
-            <TabsContent value="students" className="space-y-6">
-              <HouseholdStatus households={(data?.households ?? []) as Household[]} />
-            </TabsContent>
-          </Tabs>
+          <>
+            {data?.banquet && <BanquetSummaryCard banquet={data.banquet} />}
+            <Tabs defaultValue="calendar" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                <TabsTrigger value="students">Student summary</TabsTrigger>
+              </TabsList>
+              <TabsContent value="calendar" className="space-y-6">
+                <MeetingCalendar meetings={(data?.meetings ?? []) as MeetingRow[]} />
+              </TabsContent>
+              <TabsContent value="students" className="space-y-6">
+                <HouseholdStatus households={(data?.households ?? []) as Household[]} />
+              </TabsContent>
+            </Tabs>
+          </>
         )}
       </main>
     </div>

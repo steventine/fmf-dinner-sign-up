@@ -141,6 +141,8 @@ export function BanquetCard({ guid }: { guid: string }) {
         </div>
       )}
 
+      <WhatOthersAreBringing categories={categories} />
+
       <div>
         <Button variant={myRsvp ? "outline" : "default"} onClick={() => setDialogOpen(true)}>
           {myRsvp ? "Change RSVP / add items" : "RSVP for the banquet"}
@@ -157,6 +159,26 @@ export function BanquetCard({ guid }: { guid: string }) {
         onConfirm={(input) => submitMut.mutate(input)}
       />
     </Card>
+  );
+}
+
+function WhatOthersAreBringing({ categories }: { categories: Category[] }) {
+  const withItems = categories.filter((c) => c.items.length > 0);
+  if (withItems.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-foreground">What families are bringing so far:</p>
+      <ul className="space-y-0.5 text-sm text-muted-foreground">
+        {withItems.map((c) => (
+          <li key={c.id}>
+            <span className="font-medium text-foreground">{c.name}:</span>{" "}
+            {c.items
+              .map((i) => (i.description ? `${i.household} (${i.description})` : i.household))
+              .join(", ")}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -239,7 +261,9 @@ function RsvpDialog({
           {attending && (
             <>
               <div className="space-y-1">
-                <Label htmlFor="guests">How many people are attending (including your student)?</Label>
+                <Label htmlFor="guests">
+                  How many people are attending (including your student)?
+                </Label>
                 <Input
                   id="guests"
                   type="number"
@@ -285,6 +309,18 @@ function RsvpDialog({
                               </span>
                             </Label>
                             <p className="text-xs text-muted-foreground">{c.description}</p>
+                            {c.items.length > 0 && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Already claimed:{" "}
+                                {c.items
+                                  .map((i) =>
+                                    i.description
+                                      ? `${i.household} (${i.description})`
+                                      : i.household,
+                                  )
+                                  .join(", ")}
+                              </p>
+                            )}
                             {sel.checked && (
                               <Input
                                 className="mt-2"

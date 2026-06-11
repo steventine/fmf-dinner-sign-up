@@ -48,24 +48,33 @@ export async function getBanquetCategories(banquetId: string) {
   return data ?? [];
 }
 
-// Claimed count per category for one banquet.
-export async function getClaimedCounts(banquetId: string): Promise<Map<string, number>> {
+export type ClaimedItem = { household: string; description: string | null };
+
+// Claimed items per category for one banquet, with the claiming household's name.
+export async function getClaimedItems(banquetId: string): Promise<Map<string, ClaimedItem[]>> {
   const { data, error } = await supabaseAdmin
     .from("banquet_item_signups")
-    .select("category_id, banquet_item_categories!inner(banquet_id)")
+    .select(
+      "category_id, item_description, banquet_item_categories!inner(banquet_id), banquet_rsvps!inner(students(name))",
+    )
     .eq("banquet_item_categories.banquet_id", banquetId);
   if (error) throw new Error(error.message);
-  const counts = new Map<string, number>();
+
+  const items = new Map<string, ClaimedItem[]>();
   for (const row of data ?? []) {
-    counts.set(row.category_id, (counts.get(row.category_id) ?? 0) + 1);
+    const rsvp = Array.isArray(row.banquet_rsvps) ? row.banquet_rsvps[0] : row.banquet_rsvps;
+    const student = Array.isArray(rsvp?.students) ? rsvp?.students[0] : rsvp?.students;
+    const list = items.get(row.category_id) ?? [];
+    list.push({ household: student?.name ?? "A household", description: row.item_description });
+    items.set(row.category_id, list);
   }
-  return counts;
+  return items;
 }
 
 export async function getBanquetSummary(banquet: BanquetRow) {
-  const [categories, counts, rsvps] = await Promise.all([
+  const [categories, claimedItems, rsvps] = await Promise.all([
     getBanquetCategories(banquet.id),
-    getClaimedCounts(banquet.id),
+    getClaimedItems(banquet.id),
     supabaseAdmin
       .from("banquet_rsvps")
       .select("attending, guest_count")
@@ -90,7 +99,8 @@ export async function getBanquetSummary(banquet: BanquetRow) {
       name: c.name,
       description: c.description,
       capacity: c.capacity,
-      claimed: counts.get(c.id) ?? 0,
+      claimed: claimedItems.get(c.id)?.length ?? 0,
+      items: claimedItems.get(c.id) ?? [],
     })),
   };
 }

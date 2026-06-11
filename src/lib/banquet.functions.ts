@@ -7,7 +7,7 @@ import {
   formatBanquetDate,
   getActiveBanquet,
   getBanquetCategories,
-  getClaimedCounts,
+  getClaimedItems,
 } from "./banquet.server";
 import { renderAndSendTemplate } from "./email.server";
 
@@ -21,11 +21,15 @@ const BanquetDetailsSchema = z.object({
 });
 
 async function categoriesWithClaimed(banquetId: string) {
-  const [categories, counts] = await Promise.all([
+  const [categories, claimedItems] = await Promise.all([
     getBanquetCategories(banquetId),
-    getClaimedCounts(banquetId),
+    getClaimedItems(banquetId),
   ]);
-  return categories.map((c) => ({ ...c, claimed: counts.get(c.id) ?? 0 }));
+  return categories.map((c) => ({
+    ...c,
+    claimed: claimedItems.get(c.id)?.length ?? 0,
+    items: claimedItems.get(c.id) ?? [],
+  }));
 }
 
 // Claim items via the capacity-enforcing RPC; returns category ids that were full.

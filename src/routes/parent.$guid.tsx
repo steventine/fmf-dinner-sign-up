@@ -130,6 +130,8 @@ function ParentPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
+        <BanquetCard guid={guid} />
+
         <Card className="space-y-4 p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
@@ -175,8 +177,6 @@ function ParentPage() {
             </div>
           )}
         </Card>
-
-        <BanquetCard guid={guid} />
 
         <MeetingCalendar
           meetings={meetings as MeetingRow[]}
