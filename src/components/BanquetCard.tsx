@@ -239,7 +239,7 @@ function RsvpDialog({
           {attending && (
             <>
               <div className="space-y-1">
-                <Label htmlFor="guests">How many people are attending (including you)?</Label>
+                <Label htmlFor="guests">How many people are attending (including your student)?</Label>
                 <Input
                   id="guests"
                   type="number"
