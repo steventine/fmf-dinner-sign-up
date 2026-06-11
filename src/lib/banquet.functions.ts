@@ -326,6 +326,16 @@ export const submitBanquetRsvp = createServerFn({ method: "POST" })
           )
           .max(20)
           .default([]),
+        updateItems: z
+          .array(
+            z.object({
+              itemSignupId: z.string().uuid(),
+              itemDescription: z.string().trim().max(200).optional(),
+            }),
+          )
+          .max(20)
+          .default([]),
+        removeItemSignupIds: z.array(z.string().uuid()).max(20).default([]),
       })
       .parse(input),
   )
@@ -341,9 +351,18 @@ export const submitBanquetRsvp = createServerFn({ method: "POST" })
       .eq("student_id", parent.student_id)
       .maybeSingle();
     if (exErr) throw new Error(exErr.message);
-    const existingItemCount = existing?.banquet_item_signups?.length ?? 0;
 
-    if (data.attending && existingItemCount + data.items.length === 0) {
+    // Updates and removals may only reference the household's own item sign-ups.
+    const existingItemIds = new Set((existing?.banquet_item_signups ?? []).map((s) => s.id));
+    for (const id of [
+      ...data.removeItemSignupIds,
+      ...data.updateItems.map((u) => u.itemSignupId),
+    ]) {
+      if (!existingItemIds.has(id)) throw new Error("Item sign-up not found");
+    }
+
+    const remainingItemCount = existingItemIds.size - data.removeItemSignupIds.length;
+    if (data.attending && remainingItemCount + data.items.length === 0) {
       throw new Error("Please pick at least one item to bring.");
     }
 
@@ -374,6 +393,22 @@ export const submitBanquetRsvp = createServerFn({ method: "POST" })
         .eq("rsvp_id", rsvp.id);
       if (error) throw new Error(error.message);
       return { ok: true, failedCategories: [] };
+    }
+
+    if (data.removeItemSignupIds.length > 0) {
+      const { error } = await supabaseAdmin
+        .from("banquet_item_signups")
+        .delete()
+        .in("id", data.removeItemSignupIds);
+      if (error) throw new Error(error.message);
+    }
+
+    for (const update of data.updateItems) {
+      const { error } = await supabaseAdmin
+        .from("banquet_item_signups")
+        .update({ item_description: update.itemDescription?.trim() || null })
+        .eq("id", update.itemSignupId);
+      if (error) throw new Error(error.message);
     }
 
     const failedCategories = await claimItems(rsvp.id, data.items);

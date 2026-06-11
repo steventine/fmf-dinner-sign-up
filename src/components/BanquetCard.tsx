@@ -41,6 +41,8 @@ export function BanquetCard({ guid }: { guid: string }) {
       attending: boolean;
       guestCount: number;
       items: { categoryId: string; itemDescription?: string }[];
+      updateItems: { itemSignupId: string; itemDescription?: string }[];
+      removeItemSignupIds: string[];
     }) => submit({ data: { guid, ...input } }),
     onSuccess: (res, input) => {
       qc.invalidateQueries({ queryKey });
@@ -154,7 +156,7 @@ export function BanquetCard({ guid }: { guid: string }) {
         onOpenChange={setDialogOpen}
         categories={categories}
         myRsvp={myRsvp}
-        existingItemCount={myItems.length}
+        myItems={myItems}
         loading={submitMut.isPending}
         onConfirm={(input) => submitMut.mutate(input)}
       />
@@ -182,12 +184,20 @@ function WhatOthersAreBringing({ categories }: { categories: Category[] }) {
   );
 }
 
+type SelectedEntry = {
+  checked: boolean;
+  desc: string;
+  // Present when the household already has an item sign-up in this category.
+  itemSignupId?: string;
+  originalDesc?: string;
+};
+
 function RsvpDialog({
   open,
   onOpenChange,
   categories,
   myRsvp,
-  existingItemCount,
+  myItems,
   loading,
   onConfirm,
 }: {
@@ -195,34 +205,66 @@ function RsvpDialog({
   onOpenChange: (v: boolean) => void;
   categories: Category[];
   myRsvp: BanquetData["myRsvp"];
-  existingItemCount: number;
+  myItems: BanquetData["myItems"];
   loading: boolean;
   onConfirm: (input: {
     attending: boolean;
     guestCount: number;
     items: { categoryId: string; itemDescription?: string }[];
+    updateItems: { itemSignupId: string; itemDescription?: string }[];
+    removeItemSignupIds: string[];
   }) => void;
 }) {
   const [attending, setAttending] = useState(true);
   const [guestCount, setGuestCount] = useState(2);
-  const [selected, setSelected] = useState<Record<string, { checked: boolean; desc: string }>>({});
+  const [selected, setSelected] = useState<Record<string, SelectedEntry>>({});
 
   useEffect(() => {
     if (open) {
       setAttending(myRsvp?.attending ?? true);
       setGuestCount(myRsvp?.guest_count ?? 2);
-      setSelected({});
+      // Pre-fill from the household's current items (first item per category;
+      // any extra duplicates in a category stay untouched and count toward the minimum).
+      const initial: Record<string, SelectedEntry> = {};
+      for (const item of myItems) {
+        if (initial[item.category_id]) continue;
+        initial[item.category_id] = {
+          checked: true,
+          desc: item.item_description ?? "",
+          itemSignupId: item.id,
+          originalDesc: item.item_description ?? "",
+        };
+      }
+      setSelected(initial);
     }
-  }, [open, myRsvp]);
+  }, [open, myRsvp, myItems]);
 
-  const selectedItems = Object.entries(selected)
-    .filter(([, v]) => v.checked)
-    .map(([categoryId, v]) => ({
-      categoryId,
+  // Items in the same category beyond the first are not shown in the picker; they
+  // still exist and count toward the "at least one item" requirement.
+  const managedIds = new Set(
+    Object.values(selected)
+      .map((v) => v.itemSignupId)
+      .filter(Boolean),
+  );
+  const unmanagedCount = myItems.filter((i) => !managedIds.has(i.id)).length;
+
+  const entries = Object.entries(selected);
+  const newItems = entries
+    .filter(([, v]) => v.checked && !v.itemSignupId)
+    .map(([categoryId, v]) => ({ categoryId, itemDescription: v.desc.trim() || undefined }));
+  const updateItems = entries
+    .filter(([, v]) => v.checked && v.itemSignupId && v.desc !== v.originalDesc)
+    .map(([, v]) => ({
+      itemSignupId: v.itemSignupId!,
       itemDescription: v.desc.trim() || undefined,
     }));
+  const removeItemSignupIds = entries
+    .filter(([, v]) => !v.checked && v.itemSignupId)
+    .map(([, v]) => v.itemSignupId!);
 
-  const needsItem = attending && existingItemCount + selectedItems.length === 0;
+  const checkedCount = entries.filter(([, v]) => v.checked).length;
+  const needsItem = attending && checkedCount + unmanagedCount === 0;
+  const existingItemCount = myItems.length;
   const droppingItems = !attending && existingItemCount > 0;
 
   return (
@@ -281,9 +323,9 @@ function RsvpDialog({
                 <Label>What would you like to bring?</Label>
                 <div className="space-y-2">
                   {categories.map((c) => {
-                    const remaining = c.capacity - c.claimed;
-                    const full = remaining <= 0;
-                    const sel = selected[c.id] ?? { checked: false, desc: "" };
+                    const sel: SelectedEntry = selected[c.id] ?? { checked: false, desc: "" };
+                    // A full category stays selectable when it's the household's own claim.
+                    const full = c.capacity - c.claimed <= 0 && !sel.itemSignupId;
                     return (
                       <div
                         key={c.id}
@@ -365,7 +407,9 @@ function RsvpDialog({
               onConfirm({
                 attending,
                 guestCount: attending ? guestCount : 0,
-                items: attending ? selectedItems : [],
+                items: attending ? newItems : [],
+                updateItems: attending ? updateItems : [],
+                removeItemSignupIds: attending ? removeItemSignupIds : [],
               })
             }
             disabled={loading || needsItem}
