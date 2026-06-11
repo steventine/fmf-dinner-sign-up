@@ -77,6 +77,11 @@ async function resolveAudience(
     const banquet = await getActiveBanquet();
     if (!banquet) return [];
 
+    // Once the banquet has happened there is no one left to email — this also
+    // silences any still-enabled scheduled campaigns targeting these audiences.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (banquet.date < todayStr) return [];
+
     const { data: rsvps } = await supabaseAdmin
       .from("banquet_rsvps")
       .select("student_id, attending")
