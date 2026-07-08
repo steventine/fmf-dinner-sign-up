@@ -9,7 +9,7 @@ import {
   getBanquetCategories,
   getClaimedItems,
 } from "./banquet.server";
-import { renderAndSendTemplate } from "./email.server";
+import { markdownToEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
 
 const GuidSchema = z.string().uuid();
 
@@ -240,42 +240,47 @@ export const adminSendBanquetInvites = createServerFn({ method: "POST" })
     const appUrl = settings?.app_url ?? "";
     const banquetDate = formatBanquetDate(banquet.date);
 
-    let sent = 0;
-    let failed = 0;
-    for (const parent of parents ?? []) {
-      if (respondedStudents.has(parent.student_id)) continue;
+    const { data: tpl, error: tErr } = await supabaseAdmin
+      .from("email_templates")
+      .select("subject, markdown_body")
+      .eq("key", "banquet_invitation")
+      .maybeSingle();
+    if (tErr) throw new Error(tErr.message);
+    if (!tpl) throw new Error("Email template not found: banquet_invitation");
 
-      let status: "sent" | "failed" = "sent";
-      let errorMessage: string | null = null;
-      try {
-        await renderAndSendTemplate({
-          key: "banquet_invitation",
-          to: parent.email,
-          variables: {
-            parent_name: parent.name,
-            banquet_date: banquetDate,
-            banquet_time: banquet.time ?? "",
-            banquet_location: banquet.location ?? "",
-            banquet_notes: banquet.notes ?? "",
-            link_url: `${appUrl}/parent/${parent.unique_guid}`,
-          },
-        });
-        sent++;
-      } catch (e) {
-        failed++;
-        status = "failed";
-        errorMessage = e instanceof Error ? e.message : String(e);
-      }
+    const recipients = (parents ?? []).filter((p) => !respondedStudents.has(p.student_id));
+    if (!recipients.length) return { sent: 0, failed: 0 };
 
-      await supabaseAdmin.from("email_send_log").insert({
+    const emails = recipients.map((parent) => {
+      const variables: Record<string, string> = {
+        parent_name: parent.name,
+        banquet_date: banquetDate,
+        banquet_time: banquet.time ?? "",
+        banquet_location: banquet.location ?? "",
+        banquet_notes: banquet.notes ?? "",
+        link_url: `${appUrl}/parent/${parent.unique_guid}`,
+      };
+      return {
+        to: parent.email,
+        subject: renderTemplateString(tpl.subject, variables),
+        html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+      };
+    });
+
+    const results = await sendEmailBatchViaResend(emails);
+
+    await supabaseAdmin.from("email_send_log").insert(
+      recipients.map((parent, i) => ({
         template_key: "banquet_invitation",
         parent_id: parent.id,
         triggered_by: "admin",
-        status,
-        error_message: errorMessage,
-      });
-    }
-    return { sent, failed };
+        status: results[i].status,
+        error_message: results[i].errorMessage,
+      })),
+    );
+
+    const sent = results.filter((r) => r.status === "sent").length;
+    return { sent, failed: results.length - sent };
   });
 
 /* ------------------------------- Parent ------------------------------- */

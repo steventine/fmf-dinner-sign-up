@@ -1,6 +1,6 @@
 // Audience resolution, scheduled heartbeat, and shared send logic for the campaign manager.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { markdownToEmailHtml, renderTemplateString, sendEmailViaResend } from "./email.server";
+import { markdownToEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
 import { currentSeasonYear } from "./dinners.server";
 import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
@@ -11,6 +11,33 @@ type ParentRecipient = {
   unique_guid: string;
   dinners_remaining?: number;
 };
+
+// Reminder windows are computed on the team's local calendar, and sends are held
+// until this local hour — otherwise the "days before" window opens at midnight
+// and the hourly cron would email parents overnight.
+const TEAM_TIMEZONE = "America/New_York";
+const REMINDER_SEND_HOUR = 5;
+
+// Today's date (YYYY-MM-DD) in the team's timezone. en-CA formats as YYYY-MM-DD.
+function teamToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TEAM_TIMEZONE }).format(new Date());
+}
+
+function teamHour(): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: TEAM_TIMEZONE,
+      hour: "numeric",
+      hourCycle: "h23",
+    }).format(new Date()),
+  );
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 async function resolveAudience(
   audienceType: string,
@@ -79,8 +106,7 @@ async function resolveAudience(
 
     // Once the banquet has happened there is no one left to email — this also
     // silences any still-enabled scheduled campaigns targeting these audiences.
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (banquet.date < todayStr) return [];
+    if (banquet.date < teamToday()) return [];
 
     const { data: rsvps } = await supabaseAdmin
       .from("banquet_rsvps")
@@ -133,10 +159,7 @@ export async function sendToAudience(args: {
     banquet_notes: banquet?.notes ?? "",
   };
 
-  let sent = 0;
-  let failed = 0;
-
-  for (const parent of recipients) {
+  const emails = recipients.map((parent) => {
     const variables: Record<string, string> = {
       parent_name: parent.name,
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
@@ -145,32 +168,29 @@ export async function sendToAudience(args: {
         ? { dinners_remaining: String(parent.dinners_remaining) }
         : {}),
     };
+    return {
+      to: parent.email,
+      subject: renderTemplateString(subject, variables),
+      html: markdownToEmailHtml(renderTemplateString(markdownBody, variables)),
+    };
+  });
 
-    const resolvedSubject = renderTemplateString(subject, variables);
-    const html = markdownToEmailHtml(renderTemplateString(markdownBody, variables));
+  const results = await sendEmailBatchViaResend(emails);
 
-    let status: "sent" | "failed" = "sent";
-    let errorMessage: string | null = null;
-
-    try {
-      await sendEmailViaResend({ to: parent.email, subject: resolvedSubject, html });
-      sent++;
-    } catch (e) {
-      failed++;
-      status = "failed";
-      errorMessage = e instanceof Error ? e.message : String(e);
-    }
-
-    await supabaseAdmin.from("email_send_log").insert({
-      template_key: templateKey,
-      parent_id: parent.id,
-      triggered_by: triggeredBy,
-      status,
-      error_message: errorMessage,
-    });
+  if (recipients.length > 0) {
+    await supabaseAdmin.from("email_send_log").insert(
+      recipients.map((parent, i) => ({
+        template_key: templateKey,
+        parent_id: parent.id,
+        triggered_by: triggeredBy,
+        status: results[i].status,
+        error_message: results[i].errorMessage,
+      })),
+    );
   }
 
-  return { sent, failed };
+  const sent = results.filter((r) => r.status === "sent").length;
+  return { sent, failed: results.length - sent };
 }
 
 // Parses our supported cron patterns (daily/weekly/monthly) to compute the next run time.
@@ -212,6 +232,8 @@ export function computeNextRunAt(cron: string, after: Date = new Date()): Date |
 }
 
 export async function runMeetingReminderHeartbeat(): Promise<void> {
+  if (teamHour() < REMINDER_SEND_HOUR) return;
+
   const { data: tpl } = await supabaseAdmin
     .from("email_templates")
     .select("subject, markdown_body, reminder_days_before")
@@ -227,11 +249,8 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
     .single();
   const appUrl = settings?.app_url ?? "";
 
-  const today = new Date();
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
-  const todayStr = today.toISOString().slice(0, 10);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const todayStr = teamToday();
+  const cutoffStr = addDays(todayStr, tpl.reminder_days_before);
 
   // Filter by date on meetings first, then look up unreminded sign_ups for those meetings.
   const { data: upcomingMeetings } = await supabaseAdmin
@@ -256,6 +275,9 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
 
   if (!signUps?.length) return;
 
+  const pending: { signUpId: string; parentId: string }[] = [];
+  const emails: { to: string; subject: string; html: string }[] = [];
+
   for (const su of signUps) {
     const parent = Array.isArray(su.parents) ? su.parents[0] : su.parents;
     const student = Array.isArray(su.students) ? su.students[0] : su.students;
@@ -277,38 +299,45 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
     };
 
-    const resolvedSubject = renderTemplateString(tpl.subject, variables);
-    const html = markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables));
+    pending.push({ signUpId: su.id, parentId: su.parent_id });
+    emails.push({
+      to: parent.email,
+      subject: renderTemplateString(tpl.subject, variables),
+      html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+    });
+  }
 
-    let status: "sent" | "failed" = "sent";
-    let errorMessage: string | null = null;
+  if (!pending.length) return;
 
-    try {
-      await sendEmailViaResend({ to: parent.email, subject: resolvedSubject, html });
-    } catch (e) {
-      status = "failed";
-      errorMessage = e instanceof Error ? e.message : String(e);
-    }
+  const results = await sendEmailBatchViaResend(emails);
+  // Only stamp reminded_at on success so failed reminders retry on the next run.
+  const sentSignUpIds = pending
+    .filter((_, i) => results[i].status === "sent")
+    .map((p) => p.signUpId);
 
-    await Promise.all([
-      supabaseAdmin.from("email_send_log").insert({
-        template_key: "dinner_reminder",
-        parent_id: su.parent_id,
-        triggered_by: "schedule",
-        status,
-        error_message: errorMessage,
-      }),
-      supabaseAdmin
-        .from("sign_ups")
-        .update({ reminded_at: new Date().toISOString() })
-        .eq("id", su.id),
-    ]);
+  await supabaseAdmin.from("email_send_log").insert(
+    pending.map((p, i) => ({
+      template_key: "dinner_reminder",
+      parent_id: p.parentId,
+      triggered_by: "schedule",
+      status: results[i].status,
+      error_message: results[i].errorMessage,
+    })),
+  );
+
+  if (sentSignUpIds.length > 0) {
+    await supabaseAdmin
+      .from("sign_ups")
+      .update({ reminded_at: new Date().toISOString() })
+      .in("id", sentSignUpIds);
   }
 }
 
 // Reminds attending households what they signed up to bring, X days before the banquet.
 // Editing an RSVP clears reminded_at, so an updated reminder re-sends.
 export async function runBanquetReminderHeartbeat(): Promise<void> {
+  if (teamHour() < REMINDER_SEND_HOUR) return;
+
   const { data: tpl } = await supabaseAdmin
     .from("email_templates")
     .select("subject, markdown_body, reminder_days_before")
@@ -320,11 +349,8 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
   const banquet = await getActiveBanquet();
   if (!banquet) return;
 
-  const today = new Date();
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() + tpl.reminder_days_before);
-  const todayStr = today.toISOString().slice(0, 10);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const todayStr = teamToday();
+  const cutoffStr = addDays(todayStr, tpl.reminder_days_before);
   if (banquet.date < todayStr || banquet.date > cutoffStr) return;
 
   const { data: rsvps } = await supabaseAdmin
@@ -345,6 +371,9 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
     .single();
   const appUrl = settings?.app_url ?? "";
   const banquetDate = formatBanquetDate(banquet.date);
+
+  const pending: { rsvpId: string; parentId: string }[] = [];
+  const emails: { to: string; subject: string; html: string }[] = [];
 
   for (const rsvp of rsvps) {
     const parent = Array.isArray(rsvp.parents) ? rsvp.parents[0] : rsvp.parents;
@@ -371,32 +400,35 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
     };
 
-    const resolvedSubject = renderTemplateString(tpl.subject, variables);
-    const html = markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables));
+    pending.push({ rsvpId: rsvp.id, parentId: rsvp.parent_id });
+    emails.push({
+      to: parent.email,
+      subject: renderTemplateString(tpl.subject, variables),
+      html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+    });
+  }
 
-    let status: "sent" | "failed" = "sent";
-    let errorMessage: string | null = null;
+  if (!pending.length) return;
 
-    try {
-      await sendEmailViaResend({ to: parent.email, subject: resolvedSubject, html });
-    } catch (e) {
-      status = "failed";
-      errorMessage = e instanceof Error ? e.message : String(e);
-    }
+  const results = await sendEmailBatchViaResend(emails);
+  // Only stamp reminded_at on success so failed reminders retry on the next run.
+  const sentRsvpIds = pending.filter((_, i) => results[i].status === "sent").map((p) => p.rsvpId);
 
-    await Promise.all([
-      supabaseAdmin.from("email_send_log").insert({
-        template_key: "banquet_reminder",
-        parent_id: rsvp.parent_id,
-        triggered_by: "schedule",
-        status,
-        error_message: errorMessage,
-      }),
-      supabaseAdmin
-        .from("banquet_rsvps")
-        .update({ reminded_at: new Date().toISOString() })
-        .eq("id", rsvp.id),
-    ]);
+  await supabaseAdmin.from("email_send_log").insert(
+    pending.map((p, i) => ({
+      template_key: "banquet_reminder",
+      parent_id: p.parentId,
+      triggered_by: "schedule",
+      status: results[i].status,
+      error_message: results[i].errorMessage,
+    })),
+  );
+
+  if (sentRsvpIds.length > 0) {
+    await supabaseAdmin
+      .from("banquet_rsvps")
+      .update({ reminded_at: new Date().toISOString() })
+      .in("id", sentRsvpIds);
   }
 }
 
