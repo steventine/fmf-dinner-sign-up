@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderAndSendTemplate } from "./email.server";
-import { getActiveSeasonYear, getHouseholdProgress } from "./dinners.server";
+import { EMPTY_PROGRESS, getActiveSeasonYear, getAllHouseholdProgress } from "./dinners.server";
 import { getActiveBanquet, getBanquetSummary } from "./banquet.server";
 
 export const getPublicSchedule = createServerFn({ method: "GET" }).handler(async () => {
@@ -19,12 +19,11 @@ export const getPublicSchedule = createServerFn({ method: "GET" }).handler(async
   if (stErr) throw new Error(stErr.message);
 
   const season = await getActiveSeasonYear();
-  const households = await Promise.all(
-    (students ?? []).map(async (s) => ({
-      ...s,
-      progress: await getHouseholdProgress(s.id, season),
-    })),
-  );
+  const progressByStudent = await getAllHouseholdProgress(season);
+  const households = (students ?? []).map((s) => ({
+    ...s,
+    progress: progressByStudent.get(s.id) ?? EMPTY_PROGRESS,
+  }));
 
   const activeBanquet = await getActiveBanquet();
   const banquet = activeBanquet ? await getBanquetSummary(activeBanquet) : null;

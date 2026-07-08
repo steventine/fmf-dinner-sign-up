@@ -1,7 +1,7 @@
 // Audience resolution, scheduled heartbeat, and shared send logic for the campaign manager.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
-import { currentSeasonYear } from "./dinners.server";
+import { currentSeasonYear, getAllHouseholdProgress } from "./dinners.server";
 import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
 type ParentRecipient = {
@@ -63,32 +63,18 @@ async function resolveAudience(
 
   if (audienceType === "parents_below_quota") {
     const season = currentSeasonYear();
-    const { data: students } = await supabaseAdmin.from("students").select("id");
-    if (!students?.length) return [];
+    const progressByStudent = await getAllHouseholdProgress(season);
 
-    const belowQuota = new Set<string>();
     const remainingMap = new Map<string, number>();
-
-    await Promise.all(
-      students.map(async (s) => {
-        const { data: prog } = await supabaseAdmin.rpc("household_progress", {
-          _student_id: s.id,
-          _season: season,
-        });
-        const row = Array.isArray(prog) ? prog[0] : prog;
-        if (row && row.provided < row.required) {
-          belowQuota.add(s.id);
-          remainingMap.set(s.id, row.required - row.provided);
-        }
-      }),
-    );
-
-    if (!belowQuota.size) return [];
+    for (const [studentId, p] of progressByStudent) {
+      if (p.provided < p.required) remainingMap.set(studentId, p.required - p.provided);
+    }
+    if (!remainingMap.size) return [];
 
     const { data: parents } = await supabaseAdmin
       .from("parents")
       .select("id, name, email, unique_guid, student_id")
-      .in("student_id", [...belowQuota])
+      .in("student_id", [...remainingMap.keys()])
       .order("name");
 
     return (parents ?? []).map((p) => ({

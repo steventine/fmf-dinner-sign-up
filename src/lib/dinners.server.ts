@@ -40,6 +40,44 @@ export async function getActiveSeasonYear(today = new Date()): Promise<number> {
   return data?.season_year ?? currentSeasonYear(today);
 }
 
+export type HouseholdProgress = {
+  required: number;
+  signed_up: number;
+  approved_buyouts: number;
+  pending_buyouts: number;
+  provided: number;
+};
+
+export const EMPTY_PROGRESS: HouseholdProgress = {
+  required: 0,
+  signed_up: 0,
+  approved_buyouts: 0,
+  pending_buyouts: 0,
+  provided: 0,
+};
+
+// Progress for every student in one set-based RPC — use this instead of calling
+// getHouseholdProgress in a loop.
+export async function getAllHouseholdProgress(
+  season: number,
+): Promise<Map<string, HouseholdProgress>> {
+  const { data, error } = await supabaseAdmin.rpc("household_progress_all", {
+    _season: season,
+  });
+  if (error) throw new Error(error.message);
+  const map = new Map<string, HouseholdProgress>();
+  for (const row of data ?? []) {
+    map.set(row.student_id, {
+      required: row.required ?? 0,
+      signed_up: row.signed_up ?? 0,
+      approved_buyouts: row.approved_buyouts ?? 0,
+      pending_buyouts: row.pending_buyouts ?? 0,
+      provided: row.provided ?? 0,
+    });
+  }
+  return map;
+}
+
 export async function getHouseholdProgress(studentId: string, season: number) {
   const { data, error } = await supabaseAdmin.rpc("household_progress", {
     _student_id: studentId,
@@ -74,4 +112,3 @@ export async function requireAdminUserId(): Promise<string> {
   if (!roleRow) throw new Error("Forbidden: admin role required");
   return data.user.id;
 }
-
