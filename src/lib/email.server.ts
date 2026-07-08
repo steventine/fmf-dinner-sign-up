@@ -88,6 +88,35 @@ export function renderTemplateString(template: string, variables: Record<string,
   });
 }
 
+// Variable values include parent-entered text (dinner names, banquet item descriptions),
+// and marked passes raw HTML through — so escape HTML before values reach the markdown
+// body. Square brackets become entities too, which blocks markdown link/image injection
+// while rendering as literal brackets. Deliberate markdown in values (e.g. the ** in the
+// banquet items list) still works; entities pass through marked untouched.
+function escapeTemplateValue(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\[/g, "&#91;")
+    .replace(/\]/g, "&#93;");
+}
+
+// Render an email body: escape variable values, interpolate into the admin-authored
+// markdown template (trusted, stays unescaped), then convert to HTML.
+// Subjects are plain text — render those with renderTemplateString directly.
+export function renderEmailHtml(
+  markdownTemplate: string,
+  variables: Record<string, string>,
+): string {
+  const escaped: Record<string, string> = {};
+  for (const [name, value] of Object.entries(variables)) {
+    escaped[name] = escapeTemplateValue(value);
+  }
+  return markdownToEmailHtml(renderTemplateString(markdownTemplate, escaped));
+}
+
 export async function renderAndSendTemplate(args: {
   key: string;
   to: string;
@@ -102,8 +131,7 @@ export async function renderAndSendTemplate(args: {
   if (!tpl) throw new Error(`Email template not found: ${args.key}`);
 
   const subject = renderTemplateString(tpl.subject, args.variables);
-  const markdown = renderTemplateString(tpl.markdown_body, args.variables);
-  const html = markdownToEmailHtml(markdown);
+  const html = renderEmailHtml(tpl.markdown_body, args.variables);
 
   return sendEmailViaResend({ to: args.to, subject, html });
 }

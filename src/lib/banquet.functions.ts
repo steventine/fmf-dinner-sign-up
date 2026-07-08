@@ -9,7 +9,7 @@ import {
   getBanquetCategories,
   getClaimedItems,
 } from "./banquet.server";
-import { markdownToEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
+import { renderEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
 
 const GuidSchema = z.string().uuid();
 
@@ -263,7 +263,7 @@ export const adminSendBanquetInvites = createServerFn({ method: "POST" })
       return {
         to: parent.email,
         subject: renderTemplateString(tpl.subject, variables),
-        html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+        html: renderEmailHtml(tpl.markdown_body, variables),
       };
     });
 

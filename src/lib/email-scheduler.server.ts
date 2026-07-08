@@ -1,6 +1,6 @@
 // Audience resolution, scheduled heartbeat, and shared send logic for the campaign manager.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { markdownToEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
+import { renderEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
 import { currentSeasonYear } from "./dinners.server";
 import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
@@ -171,7 +171,7 @@ export async function sendToAudience(args: {
     return {
       to: parent.email,
       subject: renderTemplateString(subject, variables),
-      html: markdownToEmailHtml(renderTemplateString(markdownBody, variables)),
+      html: renderEmailHtml(markdownBody, variables),
     };
   });
 
@@ -303,7 +303,7 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
     emails.push({
       to: parent.email,
       subject: renderTemplateString(tpl.subject, variables),
-      html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+      html: renderEmailHtml(tpl.markdown_body, variables),
     });
   }
 
@@ -404,7 +404,7 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
     emails.push({
       to: parent.email,
       subject: renderTemplateString(tpl.subject, variables),
-      html: markdownToEmailHtml(renderTemplateString(tpl.markdown_body, variables)),
+      html: renderEmailHtml(tpl.markdown_body, variables),
     });
   }
 
