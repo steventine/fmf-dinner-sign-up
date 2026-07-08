@@ -100,6 +100,7 @@ export const signUpForMeeting = createServerFn({ method: "POST" })
 async function sendSignUpConfirmation(parent: ParentRow, meetingId: string, dinner: string) {
   let status: "sent" | "failed" = "sent";
   let errorMessage: string | null = null;
+  let emailId: string | null = null;
 
   try {
     const [{ data: meeting }, { data: student }, { data: settings }] = await Promise.all([
@@ -116,7 +117,7 @@ async function sendSignUpConfirmation(parent: ParentRow, meetingId: string, dinn
       timeZone: "UTC",
     });
 
-    await renderAndSendTemplate({
+    const sent = await renderAndSendTemplate({
       key: "dinner_confirmation",
       to: parent.email,
       variables: {
@@ -127,6 +128,7 @@ async function sendSignUpConfirmation(parent: ParentRow, meetingId: string, dinn
         link_url: `${settings?.app_url ?? ""}/parent/${parent.unique_guid}`,
       },
     });
+    emailId = sent?.id ?? null;
   } catch (e) {
     status = "failed";
     errorMessage = e instanceof Error ? e.message : String(e);
@@ -139,6 +141,7 @@ async function sendSignUpConfirmation(parent: ParentRow, meetingId: string, dinn
     triggered_by: "parent",
     status,
     error_message: errorMessage,
+    resend_email_id: emailId,
   });
 }
 

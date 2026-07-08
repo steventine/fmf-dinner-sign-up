@@ -276,6 +276,7 @@ export const adminSendBanquetInvites = createServerFn({ method: "POST" })
         triggered_by: "admin",
         status: results[i].status,
         error_message: results[i].errorMessage,
+        resend_email_id: results[i].emailId,
       })),
     );
 

@@ -262,6 +262,10 @@ export type Database = {
           triggered_by: string;
           status: string;
           error_message: string | null;
+          resend_email_id: string | null;
+          delivery_status: string | null;
+          delivery_detail: string | null;
+          delivery_updated_at: string | null;
         };
         Insert: {
           id?: string;
@@ -271,6 +275,10 @@ export type Database = {
           triggered_by: string;
           status?: string;
           error_message?: string | null;
+          resend_email_id?: string | null;
+          delivery_status?: string | null;
+          delivery_detail?: string | null;
+          delivery_updated_at?: string | null;
         };
         Update: {
           id?: string;
@@ -280,6 +288,10 @@ export type Database = {
           triggered_by?: string;
           status?: string;
           error_message?: string | null;
+          resend_email_id?: string | null;
+          delivery_status?: string | null;
+          delivery_detail?: string | null;
+          delivery_updated_at?: string | null;
         };
         Relationships: [
           {

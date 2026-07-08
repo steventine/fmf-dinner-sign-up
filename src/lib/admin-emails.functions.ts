@@ -236,7 +236,9 @@ export const adminGetSendHistory = createServerFn({ method: "POST" })
     await requireAdminUserId();
     const { data: logs, error } = await supabaseAdmin
       .from("email_send_log")
-      .select("id, sent_at, triggered_by, status, error_message, parents(name, email)")
+      .select(
+        "id, sent_at, triggered_by, status, error_message, delivery_status, delivery_detail, parents(name, email)",
+      )
       .eq("template_key", data.key)
       .order("sent_at", { ascending: false })
       .limit(50);

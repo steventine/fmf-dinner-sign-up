@@ -69,6 +69,13 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Resend delivery webhooks are handled directly, outside the app router.
+      const url = new URL(request.url);
+      if (url.pathname === "/api/webhooks/resend" && request.method === "POST") {
+        const { handleResendWebhook } = await import("./lib/resend-webhook.server");
+        return await handleResendWebhook(request);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

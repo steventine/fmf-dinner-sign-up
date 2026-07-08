@@ -37,6 +37,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<anon/public key>
 VITE_SUPABASE_PROJECT_ID=<project-ref>
 
 RESEND_API_KEY=<your Resend API key>
+RESEND_WEBHOOK_SECRET=<signing secret from the Resend webhook endpoint — see "Resend webhook setup">
 ```
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are the same values as their non-`VITE_` counterparts — Vite requires the prefix to expose them to browser code.
@@ -91,6 +92,46 @@ supabase migration new <description>
 The app targets **Cloudflare Workers** via the Wrangler config in `wrangler.jsonc`. The server entry point is `src/server.ts`.
 
 The same environment variables from `.env` need to be set as secrets in your Cloudflare Workers environment.
+
+## Resend webhook setup (email delivery tracking)
+
+> **Status: not yet configured.** The code and database are ready; the two steps below
+> are pending. Until they're done, emails send normally but the admin "Recent sends"
+> table shows only `sent`/`failed` with no delivered/bounced status.
+
+The app exposes `POST /api/webhooks/resend`, which records delivery, bounce, and
+complaint events from Resend onto each row in `email_send_log`. Bounced sends show up
+as red badges (with the bounce reason on hover) in the admin **Emails → Recent sends**
+table — this is how you spot bad parent email addresses.
+
+### 1. Create the webhook endpoint in Resend
+
+1. In the [Resend dashboard](https://resend.com), go to **Webhooks → Add endpoint**.
+2. Set the endpoint URL to:
+   ```
+   https://<your-production-url>/api/webhooks/resend
+   ```
+3. Subscribe to at least these events:
+   - `email.delivered`
+   - `email.bounced`
+   - `email.complained`
+   - `email.delivery_delayed`
+
+   (`email.opened` / `email.clicked` are harmlessly ignored if enabled.)
+4. Copy the endpoint's **signing secret** (starts with `whsec_`).
+
+### 2. Set the signing secret in Cloudflare
+
+```bash
+bunx wrangler secret put RESEND_WEBHOOK_SECRET
+```
+
+Paste the `whsec_…` value when prompted (or set it in the Cloudflare dashboard under
+**Workers → Settings → Variables and Secrets**). Redeploy afterward.
+
+For local testing, also put the same value in `.env` as `RESEND_WEBHOOK_SECRET`.
+Requests with a missing or invalid signature are rejected, so the endpoint is safe to
+expose publicly.
 
 ## Google OAuth setup
 

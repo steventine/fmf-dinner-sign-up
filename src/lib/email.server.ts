@@ -9,12 +9,14 @@ export function markdownToEmailHtml(markdown: string): string {
 
 const DEFAULT_FROM = "FullMetal Falcons Dinners <dinners@fmf.tinefamily.com>";
 
+// Resend returns { id } for single sends and { data: [{ id }] } for batches;
+// we store the id on email_send_log so delivery webhooks can find the row.
 export async function sendEmailViaResend(args: {
   to: string;
   subject: string;
   html: string;
   from?: string;
-}) {
+}): Promise<{ id?: string }> {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
 
@@ -40,7 +42,11 @@ export async function sendEmailViaResend(args: {
 }
 
 export type BatchEmail = { to: string; subject: string; html: string };
-export type BatchSendResult = { status: "sent" | "failed"; errorMessage: string | null };
+export type BatchSendResult = {
+  status: "sent" | "failed";
+  errorMessage: string | null;
+  emailId: string | null;
+};
 
 // Resend's batch endpoint accepts up to 100 emails per request.
 const RESEND_BATCH_LIMIT = 100;
@@ -72,10 +78,17 @@ export async function sendEmailBatchViaResend(emails: BatchEmail[]): Promise<Bat
         const body = await res.text();
         throw new Error(`Resend batch send failed [${res.status}]: ${body}`);
       }
-      for (const _ of chunk) results.push({ status: "sent", errorMessage: null });
+      const payload = (await res.json()) as { data?: { id?: string }[] };
+      chunk.forEach((_, j) => {
+        results.push({
+          status: "sent",
+          errorMessage: null,
+          emailId: payload.data?.[j]?.id ?? null,
+        });
+      });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      for (const _ of chunk) results.push({ status: "failed", errorMessage });
+      for (const _ of chunk) results.push({ status: "failed", errorMessage, emailId: null });
     }
   }
   return results;

@@ -171,6 +171,7 @@ export async function sendToAudience(args: {
         triggered_by: triggeredBy,
         status: results[i].status,
         error_message: results[i].errorMessage,
+        resend_email_id: results[i].emailId,
       })),
     );
   }
@@ -308,6 +309,7 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
       triggered_by: "schedule",
       status: results[i].status,
       error_message: results[i].errorMessage,
+      resend_email_id: results[i].emailId,
     })),
   );
 
@@ -407,6 +409,7 @@ export async function runBanquetReminderHeartbeat(): Promise<void> {
       triggered_by: "schedule",
       status: results[i].status,
       error_message: results[i].errorMessage,
+      resend_email_id: results[i].emailId,
     })),
   );
 

@@ -899,12 +899,20 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
                         <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
                         <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
                         <td className="py-2">
-                          <Badge
-                            variant={log.status === "sent" ? "secondary" : "destructive"}
-                            className="text-xs"
-                          >
-                            {log.status}
-                          </Badge>
+                          {(() => {
+                            // Prefer the webhook-reported delivery status once it arrives.
+                            const shown = log.delivery_status ?? log.status;
+                            const bad = ["failed", "bounced", "complained"].includes(shown);
+                            return (
+                              <Badge
+                                variant={bad ? "destructive" : "secondary"}
+                                className="text-xs"
+                                title={log.delivery_detail ?? log.error_message ?? undefined}
+                              >
+                                {shown}
+                              </Badge>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
