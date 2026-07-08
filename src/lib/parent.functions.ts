@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getActiveSeasonYear, getHouseholdProgress, getParentByGuid } from "./dinners.server";
+import { renderAndSendTemplate } from "./email.server";
+import type { ParentRow } from "./dinners.server";
 
 const GuidSchema = z.string().uuid();
 
@@ -88,8 +90,57 @@ export const signUpForMeeting = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
+
+    await sendSignUpConfirmation(parent, data.meetingId, data.dinner);
     return { ok: true };
   });
+
+// Best-effort confirmation email — the sign-up has already succeeded, so email
+// problems are logged but never surfaced to the parent.
+async function sendSignUpConfirmation(parent: ParentRow, meetingId: string, dinner: string) {
+  let status: "sent" | "failed" = "sent";
+  let errorMessage: string | null = null;
+
+  try {
+    const [{ data: meeting }, { data: student }, { data: settings }] = await Promise.all([
+      supabaseAdmin.from("meetings").select("date").eq("id", meetingId).single(),
+      supabaseAdmin.from("students").select("name").eq("id", parent.student_id).single(),
+      supabaseAdmin.from("settings").select("app_url").eq("id", 1).single(),
+    ]);
+    if (!meeting) throw new Error("Meeting not found for confirmation email");
+
+    const meetingDate = new Date(meeting.date + "T12:00:00Z").toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+
+    await renderAndSendTemplate({
+      key: "dinner_confirmation",
+      to: parent.email,
+      variables: {
+        parent_name: parent.name,
+        student_name: student?.name ?? "",
+        meeting_date: meetingDate,
+        dinner,
+        link_url: `${settings?.app_url ?? ""}/parent/${parent.unique_guid}`,
+      },
+    });
+  } catch (e) {
+    status = "failed";
+    errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("Failed to send sign-up confirmation email", e);
+  }
+
+  await supabaseAdmin.from("email_send_log").insert({
+    template_key: "dinner_confirmation",
+    parent_id: parent.id,
+    triggered_by: "parent",
+    status,
+    error_message: errorMessage,
+  });
+}
 
 export const cancelSignUp = createServerFn({ method: "POST" })
   .inputValidator((input) =>
