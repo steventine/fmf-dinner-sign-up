@@ -8,8 +8,9 @@
     "SUPABASE_URL": "https://qpkmqrdmjfdmrherqmia.supabase.co",
   },
   "triggers": {
-    // Runs daily at 9am UTC — picks up any scheduled email templates that are due.
-    "crons": ["0 9 * * *"]
+    // Runs hourly — picks up scheduled email templates and reminders that are due,
+    // so campaigns send within an hour of their configured time instead of the next morning.
+    "crons": ["0 * * * *"]
   },
   "observability": {
     "logs": {
