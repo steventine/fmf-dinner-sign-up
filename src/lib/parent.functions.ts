@@ -1,11 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  getActiveSeasonYear,
-  getHouseholdProgress,
-  getParentByGuid,
-} from "./dinners.server";
+import { getActiveSeasonYear, getHouseholdProgress, getParentByGuid } from "./dinners.server";
 
 const GuidSchema = z.string().uuid();
 
@@ -14,41 +10,45 @@ export const getParentContext = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const parent = await getParentByGuid(data.guid);
 
-    const { data: household, error: hhErr } = await supabaseAdmin
-      .from("students")
-      .select("id, name, dinners_required")
-      .eq("id", parent.student_id)
-      .single();
+    // Everything below only depends on the parent row, so run it in parallel.
+    // Progress needs the season, so those two stay chained inside the batch.
+    const [
+      { data: household, error: hhErr },
+      { season, progress },
+      { data: meetings, error: mErr },
+      { data: mySignUps, error: suErr },
+      { data: buyOuts, error: boErr },
+      { data: settingsRow, error: setErr },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("students")
+        .select("id, name, dinners_required")
+        .eq("id", parent.student_id)
+        .single(),
+      getActiveSeasonYear().then(async (season) => ({
+        season,
+        progress: await getHouseholdProgress(parent.student_id, season),
+      })),
+      supabaseAdmin
+        .from("v_meeting_status")
+        .select("meeting_id, date, season_year, notes, student_id, household_name, dinner")
+        .order("date", { ascending: true }),
+      supabaseAdmin
+        .from("sign_ups")
+        .select("id, meeting_id, parent_id, dinner, created_at, cancelled_at")
+        .eq("student_id", parent.student_id)
+        .is("cancelled_at", null),
+      supabaseAdmin
+        .from("buy_outs")
+        .select("id, season_year, amount, dinners, requested_at, approved, approved_at")
+        .eq("student_id", parent.student_id)
+        .order("requested_at", { ascending: false }),
+      supabaseAdmin.from("settings").select("buyout_price").eq("id", 1).single(),
+    ]);
     if (hhErr) throw new Error(hhErr.message);
-
-    const season = await getActiveSeasonYear();
-    const progress = await getHouseholdProgress(parent.student_id, season);
-
-    const { data: meetings, error: mErr } = await supabaseAdmin
-      .from("v_meeting_status")
-      .select("meeting_id, date, season_year, notes, student_id, household_name, dinner")
-      .order("date", { ascending: true });
     if (mErr) throw new Error(mErr.message);
-
-    const { data: mySignUps, error: suErr } = await supabaseAdmin
-      .from("sign_ups")
-      .select("id, meeting_id, parent_id, dinner, created_at, cancelled_at")
-      .eq("student_id", parent.student_id)
-      .is("cancelled_at", null);
     if (suErr) throw new Error(suErr.message);
-
-    const { data: buyOuts, error: boErr } = await supabaseAdmin
-      .from("buy_outs")
-      .select("id, season_year, amount, dinners, requested_at, approved, approved_at")
-      .eq("student_id", parent.student_id)
-      .order("requested_at", { ascending: false });
     if (boErr) throw new Error(boErr.message);
-
-    const { data: settingsRow, error: setErr } = await supabaseAdmin
-      .from("settings")
-      .select("buyout_price")
-      .eq("id", 1)
-      .single();
     if (setErr) throw new Error(setErr.message);
 
     return {
