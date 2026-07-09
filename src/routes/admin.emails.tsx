@@ -106,7 +106,18 @@ function SendHistoryCard({ templateKey }: { templateKey: string }) {
     queryFn: () => getHistory({ data: { key: templateKey } }),
   });
 
-  if (!history || history.length === 0) return null;
+  // Stay hidden only while loading; once loaded, an empty log shows an
+  // empty state so it's clear sends are tracked but none have happened.
+  if (!history) return null;
+
+  if (history.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="mb-3 font-semibold">Recent sends</h3>
+        <p className="text-sm text-muted-foreground">No sends recorded yet.</p>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">
