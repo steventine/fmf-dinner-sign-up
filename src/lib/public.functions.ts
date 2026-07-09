@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { renderAndSendTemplate } from "./email.server";
+import { sendTemplateToParentAndLog } from "./email.server";
 import { EMPTY_PROGRESS, getActiveSeasonYear, getAllHouseholdProgress } from "./dinners.server";
 import { getActiveBanquet, getBanquetSummary } from "./banquet.server";
 
@@ -49,9 +49,11 @@ export const requestParentLink = createServerFn({ method: "POST" })
         .single();
       const url = `${settings?.app_url ?? ""}/parent/${parent.unique_guid}`;
       try {
-        await renderAndSendTemplate({
+        await sendTemplateToParentAndLog({
           key: "parent_link",
           to: parent.email,
+          parentId: parent.id,
+          triggeredBy: "parent",
           variables: { parent_name: parent.name, link_url: url },
         });
       } catch (err) {

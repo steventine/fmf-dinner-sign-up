@@ -130,6 +130,45 @@ export function renderEmailHtml(
   return markdownToEmailHtml(renderTemplateString(markdownTemplate, escaped));
 }
 
+// Send a DB template to one parent and record the attempt in email_send_log
+// (including Resend's email id, so delivery webhooks can update the row).
+// Throws on send failure — after logging it — so callers that must not fail
+// (e.g. best-effort sends) should wrap this in try/catch.
+export async function sendTemplateToParentAndLog(args: {
+  key: string;
+  to: string;
+  parentId: string;
+  triggeredBy: string;
+  variables: Record<string, string>;
+}): Promise<void> {
+  let status: "sent" | "failed" = "sent";
+  let errorMessage: string | null = null;
+  let emailId: string | null = null;
+
+  try {
+    const sent = await renderAndSendTemplate({
+      key: args.key,
+      to: args.to,
+      variables: args.variables,
+    });
+    emailId = sent?.id ?? null;
+  } catch (e) {
+    status = "failed";
+    errorMessage = e instanceof Error ? e.message : String(e);
+  }
+
+  await supabaseAdmin.from("email_send_log").insert({
+    template_key: args.key,
+    parent_id: args.parentId,
+    triggered_by: args.triggeredBy,
+    status,
+    error_message: errorMessage,
+    resend_email_id: emailId,
+  });
+
+  if (status === "failed") throw new Error(errorMessage ?? "Email send failed");
+}
+
 export async function renderAndSendTemplate(args: {
   key: string;
   to: string;

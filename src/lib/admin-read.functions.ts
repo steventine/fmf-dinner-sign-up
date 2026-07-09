@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireAdminUserId } from "./dinners.server";
 import { getRequestHeader } from "@tanstack/react-start/server";
-import { renderAndSendTemplate } from "./email.server";
+import { sendTemplateToParentAndLog } from "./email.server";
 import { EMPTY_PROGRESS, getActiveSeasonYear, getAllHouseholdProgress } from "./dinners.server";
 
 export const adminIsAdmin = createServerFn({ method: "POST" }).handler(async () => {
@@ -117,9 +117,11 @@ export const adminResendParentLink = createServerFn({ method: "POST" })
       .eq("id", 1)
       .single();
     const url = `${settings?.app_url ?? ""}/parent/${p.unique_guid}`;
-    await renderAndSendTemplate({
+    await sendTemplateToParentAndLog({
       key: "parent_link",
       to: p.email,
+      parentId: p.id,
+      triggeredBy: "admin",
       variables: { parent_name: p.name, link_url: url },
     });
     return { ok: true };

@@ -97,6 +97,62 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString();
 }
 
+// ─── Send history ────────────────────────────────────────────────────────────
+
+function SendHistoryCard({ templateKey }: { templateKey: string }) {
+  const getHistory = useServerFn(adminGetSendHistory);
+  const { data: history } = useQuery({
+    queryKey: ["email-send-history", templateKey],
+    queryFn: () => getHistory({ data: { key: templateKey } }),
+  });
+
+  if (!history || history.length === 0) return null;
+
+  return (
+    <Card className="p-6">
+      <h3 className="mb-3 font-semibold">Recent sends</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs text-muted-foreground">
+              <th className="pb-2 pr-4 font-medium">Date</th>
+              <th className="pb-2 pr-4 font-medium">Recipient</th>
+              <th className="pb-2 pr-4 font-medium">Triggered by</th>
+              <th className="pb-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {history.map((log) => {
+              const parent = Array.isArray(log.parents) ? log.parents[0] : log.parents;
+              // Prefer the webhook-reported delivery status once it arrives.
+              const shown = log.delivery_status ?? log.status;
+              const bad = ["failed", "bounced", "complained"].includes(shown);
+              return (
+                <tr key={log.id}>
+                  <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDate(log.sent_at)}
+                  </td>
+                  <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
+                  <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
+                  <td className="py-2">
+                    <Badge
+                      variant={bad ? "destructive" : "secondary"}
+                      className="text-xs"
+                      title={log.delivery_detail ?? log.error_message ?? undefined}
+                    >
+                      {shown}
+                    </Badge>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 // ─── New template form ───────────────────────────────────────────────────────
 
 function NewTemplateForm({
@@ -458,6 +514,8 @@ function TransactionalEditor({ template }: { template: Template }) {
             ))}
         </Card>
       )}
+
+      <SendHistoryCard templateKey={template.key} />
     </div>
   );
 }
@@ -471,7 +529,6 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
   const updateSchedule = useServerFn(adminUpdateEmailSchedule);
   const resolveCount = useServerFn(adminResolveAudienceCount);
   const sendNow = useServerFn(adminSendNow);
-  const getHistory = useServerFn(adminGetSendHistory);
   const listParents = useServerFn(adminListParents);
   const qc = useQueryClient();
 
@@ -508,11 +565,6 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
     setSendAudience("all_parents");
     setSelectedParentId("");
   }, [template.key]);
-
-  const { data: history } = useQuery({
-    queryKey: ["email-send-history", template.key],
-    queryFn: () => getHistory({ data: { key: template.key } }),
-  });
 
   const { data: parents } = useQuery({
     queryKey: ["admin-parents"],
@@ -874,54 +926,7 @@ function OneOffEditor({ template, onDeleted }: { template: Template; onDeleted: 
           </Button>
         </Card>
 
-        {/* Send history */}
-        {history && history.length > 0 && (
-          <Card className="p-6">
-            <h3 className="mb-3 font-semibold">Recent sends</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">Date</th>
-                    <th className="pb-2 pr-4 font-medium">Recipient</th>
-                    <th className="pb-2 pr-4 font-medium">Triggered by</th>
-                    <th className="pb-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {history.map((log) => {
-                    const parent = Array.isArray(log.parents) ? log.parents[0] : log.parents;
-                    return (
-                      <tr key={log.id}>
-                        <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDate(log.sent_at)}
-                        </td>
-                        <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
-                        <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
-                        <td className="py-2">
-                          {(() => {
-                            // Prefer the webhook-reported delivery status once it arrives.
-                            const shown = log.delivery_status ?? log.status;
-                            const bad = ["failed", "bounced", "complained"].includes(shown);
-                            return (
-                              <Badge
-                                variant={bad ? "destructive" : "secondary"}
-                                className="text-xs"
-                                title={log.delivery_detail ?? log.error_message ?? undefined}
-                              >
-                                {shown}
-                              </Badge>
-                            );
-                          })()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
+        <SendHistoryCard templateKey={template.key} />
       </div>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>

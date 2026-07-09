@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { renderAndSendTemplate } from "./email.server";
+import { sendTemplateToParentAndLog } from "./email.server";
 import { getActiveSeasonYear, requireAdminUserId } from "./dinners.server";
 
 function formatMeetingDate(date: string): string {
@@ -15,9 +15,7 @@ function formatMeetingDate(date: string): string {
 }
 
 export const adminSendDinnerReminder = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ meetingId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input) => z.object({ meetingId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
 
@@ -48,9 +46,11 @@ export const adminSendDinnerReminder = createServerFn({ method: "POST" })
       .single();
     const link_url = `${settings?.app_url ?? ""}/parent/${signup.parent.unique_guid}`;
 
-    await renderAndSendTemplate({
+    await sendTemplateToParentAndLog({
       key: "dinner_reminder",
       to: signup.parent.email,
+      parentId: signup.parent.id,
+      triggeredBy: "admin",
       variables: {
         parent_name: signup.parent.name,
         student_name: signup.student.name,
@@ -63,20 +63,16 @@ export const adminSendDinnerReminder = createServerFn({ method: "POST" })
     return { ok: true, sentTo: signup.parent.email };
   });
 
-
-
 // ---------- Students (households) ----------
-export const adminListStudents = createServerFn({ method: "POST" }).handler(
-  async () => {
-    await requireAdminUserId();
-    const { data, error } = await supabaseAdmin
-      .from("students")
-      .select("id, name, dinners_required, created_at, parents(id, name, email, unique_guid)")
-      .order("name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  },
-);
+export const adminListStudents = createServerFn({ method: "POST" }).handler(async () => {
+  await requireAdminUserId();
+  const { data, error } = await supabaseAdmin
+    .from("students")
+    .select("id, name, dinners_required, created_at, parents(id, name, email, unique_guid)")
+    .order("name");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+});
 
 export const adminCreateStudent = createServerFn({ method: "POST" })
   .inputValidator((input) =>
@@ -112,12 +108,8 @@ export const adminUpdateStudent = createServerFn({ method: "POST" })
     await requireAdminUserId();
     const patch: { name?: string; dinners_required?: number | null } = {};
     if (data.name !== undefined) patch.name = data.name;
-    if (data.dinners_required !== undefined)
-      patch.dinners_required = data.dinners_required;
-    const { error } = await supabaseAdmin
-      .from("students")
-      .update(patch)
-      .eq("id", data.id);
+    if (data.dinners_required !== undefined) patch.dinners_required = data.dinners_required;
+    const { error } = await supabaseAdmin.from("students").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -144,11 +136,7 @@ export const adminCreateParent = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const { data: row, error } = await supabaseAdmin
-      .from("parents")
-      .insert(data)
-      .select()
-      .single();
+    const { data: row, error } = await supabaseAdmin.from("parents").insert(data).select().single();
     if (error) throw new Error(error.message);
     return row;
   });
@@ -250,10 +238,7 @@ export const adminDeleteSignUp = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ signUpId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const { error } = await supabaseAdmin
-      .from("sign_ups")
-      .delete()
-      .eq("id", data.signUpId);
+    const { error } = await supabaseAdmin.from("sign_ups").delete().eq("id", data.signUpId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -284,7 +269,9 @@ export const adminCreateSignUp = createServerFn({ method: "POST" })
     });
     if (error) {
       if (error.code === "23505") {
-        throw new Error("This meeting is already signed up for. Remove the existing sign-up first.");
+        throw new Error(
+          "This meeting is already signed up for. Remove the existing sign-up first.",
+        );
       }
       throw new Error(error.message);
     }
@@ -470,10 +457,7 @@ export const adminApproveBuyOut = createServerFn({ method: "POST" })
       patch.dinners = data.dinners;
       patch.amount = Number(s.buyout_price) * data.dinners;
     }
-    const { error } = await supabaseAdmin
-      .from("buy_outs")
-      .update(patch)
-      .eq("id", data.buyOutId);
+    const { error } = await supabaseAdmin.from("buy_outs").update(patch).eq("id", data.buyOutId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -520,10 +504,7 @@ export const adminDeleteBuyOut = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ buyOutId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const { error } = await supabaseAdmin
-      .from("buy_outs")
-      .delete()
-      .eq("id", data.buyOutId);
+    const { error } = await supabaseAdmin.from("buy_outs").delete().eq("id", data.buyOutId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
