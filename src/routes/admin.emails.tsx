@@ -15,6 +15,7 @@ import {
   adminResolveAudienceCount,
   adminSendNow,
   adminGetSendHistory,
+  adminGetAllSendLog,
   adminSendTestEmail,
   adminUpdateReminderDays,
   adminPreviewReminderHeartbeat,
@@ -99,6 +100,31 @@ function formatDate(iso: string) {
 
 // ─── Send history ────────────────────────────────────────────────────────────
 
+// Prefers the webhook-reported delivery status once it arrives; the raw
+// error/bounce detail is shown on hover.
+function SendStatusBadge({
+  log,
+}: {
+  log: {
+    status: string;
+    delivery_status: string | null;
+    delivery_detail: string | null;
+    error_message: string | null;
+  };
+}) {
+  const shown = log.delivery_status ?? log.status;
+  const bad = ["failed", "bounced", "complained"].includes(shown);
+  return (
+    <Badge
+      variant={bad ? "destructive" : "secondary"}
+      className="text-xs"
+      title={log.delivery_detail ?? log.error_message ?? undefined}
+    >
+      {shown}
+    </Badge>
+  );
+}
+
 function SendHistoryCard({ templateKey }: { templateKey: string }) {
   const getHistory = useServerFn(adminGetSendHistory);
   const { data: history } = useQuery({
@@ -135,9 +161,6 @@ function SendHistoryCard({ templateKey }: { templateKey: string }) {
           <tbody className="divide-y">
             {history.map((log) => {
               const parent = Array.isArray(log.parents) ? log.parents[0] : log.parents;
-              // Prefer the webhook-reported delivery status once it arrives.
-              const shown = log.delivery_status ?? log.status;
-              const bad = ["failed", "bounced", "complained"].includes(shown);
               return (
                 <tr key={log.id}>
                   <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
@@ -146,13 +169,7 @@ function SendHistoryCard({ templateKey }: { templateKey: string }) {
                   <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
                   <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
                   <td className="py-2">
-                    <Badge
-                      variant={bad ? "destructive" : "secondary"}
-                      className="text-xs"
-                      title={log.delivery_detail ?? log.error_message ?? undefined}
-                    >
-                      {shown}
-                    </Badge>
+                    <SendStatusBadge log={log} />
                   </td>
                 </tr>
               );
@@ -160,6 +177,137 @@ function SendHistoryCard({ templateKey }: { templateKey: string }) {
           </tbody>
         </table>
       </div>
+    </Card>
+  );
+}
+
+// ─── All-sends log view ──────────────────────────────────────────────────────
+
+const LOG_PAGE_SIZE = 100;
+
+function AllSendLog({ templates }: { templates: Template[] }) {
+  const getAllLog = useServerFn(adminGetAllSendLog);
+
+  const [templateKey, setTemplateKey] = useState("all");
+  const [problemsOnly, setProblemsOnly] = useState(false);
+  const [limit, setLimit] = useState(LOG_PAGE_SIZE);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["email-send-log-all", templateKey, problemsOnly, limit],
+    queryFn: () =>
+      getAllLog({
+        data: {
+          limit,
+          templateKey: templateKey === "all" ? undefined : templateKey,
+          problemsOnly,
+        },
+      }),
+    placeholderData: (prev) => prev,
+  });
+
+  const nameByKey = useMemo(() => new Map(templates.map((t) => [t.key, t.name])), [templates]);
+
+  const changeFilter = (apply: () => void) => {
+    setLimit(LOG_PAGE_SIZE);
+    apply();
+  };
+
+  return (
+    <Card className="space-y-4 p-6">
+      <div>
+        <h2 className="text-lg font-semibold">Send log</h2>
+        <p className="text-sm text-muted-foreground">
+          Every email the app has sent, across all templates. Delivery statuses arrive via Resend
+          webhooks; hover a status badge for the failure or bounce reason.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="w-64">
+          <Select value={templateKey} onValueChange={(v) => changeFilter(() => setTemplateKey(v))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All templates</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t.key} value={t.key}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Switch
+            checked={problemsOnly}
+            onCheckedChange={(v) => changeFilter(() => setProblemsOnly(v))}
+          />
+          Problems only
+        </label>
+      </div>
+
+      {data && data.logs.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {problemsOnly ? "No failed or bounced sends. 🎉" : "No sends recorded yet."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="pb-2 pr-4 font-medium">Date</th>
+                <th className="pb-2 pr-4 font-medium">Template</th>
+                <th className="pb-2 pr-4 font-medium">Recipient</th>
+                <th className="pb-2 pr-4 font-medium">Triggered by</th>
+                <th className="pb-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {(data?.logs ?? []).map((log) => {
+                const parent = Array.isArray(log.parents) ? log.parents[0] : log.parents;
+                const tpl = Array.isArray(log.email_templates)
+                  ? log.email_templates[0]
+                  : log.email_templates;
+                return (
+                  <tr key={log.id}>
+                    <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDate(log.sent_at)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {tpl?.name ?? nameByKey.get(log.template_key) ?? log.template_key}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {parent ? (
+                        <>
+                          {parent.name}{" "}
+                          <span className="text-xs text-muted-foreground">{parent.email}</span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
+                    <td className="py-2">
+                      <SendStatusBadge log={log} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {data?.hasMore && (
+        <Button
+          variant="outline"
+          onClick={() => setLimit((l) => l + LOG_PAGE_SIZE)}
+          disabled={isFetching}
+        >
+          {isFetching ? "Loading…" : "Load more"}
+        </Button>
+      )}
     </Card>
   );
 }
@@ -974,6 +1122,7 @@ function AdminEmails() {
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showSendLog, setShowSendLog] = useState(false);
 
   const transactional = useMemo(
     () => (templates ?? []).filter((t) => t.template_type === "transactional"),
@@ -1027,9 +1176,12 @@ function AdminEmails() {
                   onClick={() => {
                     setSelectedKey(t.key);
                     setIsCreating(false);
+                    setShowSendLog(false);
                   }}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                    selectedKey === t.key && !isCreating ? "bg-accent font-medium" : ""
+                    selectedKey === t.key && !isCreating && !showSendLog
+                      ? "bg-accent font-medium"
+                      : ""
                   }`}
                 >
                   {t.name}
@@ -1049,6 +1201,7 @@ function AdminEmails() {
               onClick={() => {
                 setIsCreating(true);
                 setSelectedKey(null);
+                setShowSendLog(false);
               }}
               className="rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-accent"
             >
@@ -1063,9 +1216,12 @@ function AdminEmails() {
                   onClick={() => {
                     setSelectedKey(t.key);
                     setIsCreating(false);
+                    setShowSendLog(false);
                   }}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                    selectedKey === t.key && !isCreating ? "bg-accent font-medium" : ""
+                    selectedKey === t.key && !isCreating && !showSendLog
+                      ? "bg-accent font-medium"
+                      : ""
                   }`}
                 >
                   <span className="block truncate">{t.name}</span>
@@ -1079,11 +1235,32 @@ function AdminEmails() {
               <li className="px-3 py-2 text-xs text-muted-foreground">No one-off templates yet.</li>
             )}
           </ul>
+
+          <Separator className="my-2" />
+
+          <ul className="space-y-0.5">
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSendLog(true);
+                  setIsCreating(false);
+                }}
+                className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
+                  showSendLog ? "bg-accent font-medium" : ""
+                }`}
+              >
+                Send log
+              </button>
+            </li>
+          </ul>
         </Card>
 
         {/* Main panel */}
         <div>
-          {isCreating ? (
+          {showSendLog ? (
+            <AllSendLog templates={templates ?? []} />
+          ) : isCreating ? (
             <NewTemplateForm onCancel={() => setIsCreating(false)} onCreated={handleCreated} />
           ) : selected?.template_type === "transactional" ? (
             <TransactionalEditor key={selected.key} template={selected} />

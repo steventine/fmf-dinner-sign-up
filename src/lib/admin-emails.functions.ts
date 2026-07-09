@@ -246,6 +246,36 @@ export const adminGetSendHistory = createServerFn({ method: "POST" })
     return logs ?? [];
   });
 
+// Cross-template send log for the admin "Send log" view. limit grows in pages
+// of 100 as the admin clicks "load more"; hasMore signals another page exists.
+export const adminGetAllSendLog = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        limit: z.number().int().min(1).max(1000).default(100),
+        templateKey: z.string().min(1).max(64).optional(),
+        problemsOnly: z.boolean().default(false),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await requireAdminUserId();
+    let query = supabaseAdmin
+      .from("email_send_log")
+      .select(
+        "id, sent_at, triggered_by, status, error_message, delivery_status, delivery_detail, template_key, email_templates(name), parents(name, email)",
+      )
+      .order("sent_at", { ascending: false })
+      .range(0, data.limit - 1);
+    if (data.templateKey) query = query.eq("template_key", data.templateKey);
+    if (data.problemsOnly) {
+      query = query.or("status.eq.failed,delivery_status.in.(bounced,complained,failed)");
+    }
+    const { data: logs, error } = await query;
+    if (error) throw new Error(error.message);
+    return { logs: logs ?? [], hasMore: (logs?.length ?? 0) === data.limit };
+  });
+
 export const adminUpdateReminderDays = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
