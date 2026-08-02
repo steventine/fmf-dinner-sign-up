@@ -166,7 +166,16 @@ function SendHistoryCard({ templateKey }: { templateKey: string }) {
                   <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">
                     {formatDate(log.sent_at)}
                   </td>
-                  <td className="py-2 pr-4">{parent?.name ?? "—"}</td>
+                  <td className="py-2 pr-4">
+                    {parent ? (
+                      <>
+                        {parent.name}{" "}
+                        <span className="text-xs text-muted-foreground">{parent.email}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="py-2 pr-4 capitalize">{log.triggered_by}</td>
                   <td className="py-2">
                     <SendStatusBadge log={log} />
