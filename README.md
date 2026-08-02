@@ -176,7 +176,9 @@ In the Supabase dashboard for this project, under **Authentication → URL Confi
 - **Site URL** — set to the new root URL (e.g. `https://dinner.example.com`)
 - **Redirect URLs** — add `<new-url>/**` to the allowlist (e.g. `https://dinner.example.com/**`)
 
-Supabase uses the Site URL as a fallback for email verification links when `emailRedirectTo` is not in the allowlist. If this isn't updated, admin sign-up confirmation emails will redirect to the old URL.
+Both matter for redirects. Supabase only honors the `redirectTo`/`emailRedirectTo` requested by the app (which is `window.location.origin`, see `src/routes/login.tsx`) if that URL matches the **Redirect URLs** allowlist. When it doesn't match, Supabase silently substitutes the **Site URL** instead. So if the allowlist is missing your current domain, both admin login (email/password and Google OAuth) and sign-up confirmation emails will bounce you back to the old URL even though the code is correct.
+
+Example symptom: after moving to `https://fmf.tinefamily.com`, logging in as admin redirected back to the old `*.workers.dev` domain — fixed by setting the Site URL and adding `https://fmf.tinefamily.com/**` to the Redirect URLs.
 
 For local dev, also add `http://localhost:8080/**` to the Redirect URLs list so verification emails work during development.
 
