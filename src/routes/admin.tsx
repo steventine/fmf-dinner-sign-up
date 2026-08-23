@@ -47,6 +47,7 @@ function AdminLayout() {
     { to: "/admin/students", label: "Students" },
     { to: "/admin/buyouts", label: "Buy-outs" },
     { to: "/admin/banquet", label: "Banquet" },
+    { to: "/admin/dinner-notes", label: "Dinner ideas" },
     { to: "/admin/overview", label: "Overview" },
     { to: "/admin/settings", label: "Settings" },
     { to: "/admin/emails", label: "Emails" },

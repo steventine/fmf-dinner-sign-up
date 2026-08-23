@@ -20,8 +20,11 @@ import { Route as AdminOverviewRouteImport } from './routes/admin.overview'
 import { Route as AdminMeetingsRouteImport } from './routes/admin.meetings'
 import { Route as AdminInvitesRouteImport } from './routes/admin.invites'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
+import { Route as AdminDinnerNotesRouteImport } from './routes/admin.dinner-notes'
 import { Route as AdminBuyoutsRouteImport } from './routes/admin.buyouts'
 import { Route as AdminBanquetRouteImport } from './routes/admin.banquet'
+import { Route as ParentGuidIndexRouteImport } from './routes/parent.$guid.index'
+import { Route as ParentGuidIdeasRouteImport } from './routes/parent.$guid.ideas'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -78,6 +81,11 @@ const AdminEmailsRoute = AdminEmailsRouteImport.update({
   path: '/emails',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDinnerNotesRoute = AdminDinnerNotesRouteImport.update({
+  id: '/dinner-notes',
+  path: '/dinner-notes',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBuyoutsRoute = AdminBuyoutsRouteImport.update({
   id: '/buyouts',
   path: '/buyouts',
@@ -88,6 +96,16 @@ const AdminBanquetRoute = AdminBanquetRouteImport.update({
   path: '/banquet',
   getParentRoute: () => AdminRoute,
 } as any)
+const ParentGuidIndexRoute = ParentGuidIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ParentGuidRoute,
+} as any)
+const ParentGuidIdeasRoute = ParentGuidIdeasRouteImport.update({
+  id: '/ideas',
+  path: '/ideas',
+  getParentRoute: () => ParentGuidRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -95,28 +113,33 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
+  '/admin/dinner-notes': typeof AdminDinnerNotesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
   '/admin/meetings': typeof AdminMeetingsRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
-  '/parent/$guid': typeof ParentGuidRoute
+  '/parent/$guid': typeof ParentGuidRouteWithChildren
   '/admin/': typeof AdminIndexRoute
+  '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid/': typeof ParentGuidIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
+  '/admin/dinner-notes': typeof AdminDinnerNotesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
   '/admin/meetings': typeof AdminMeetingsRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
-  '/parent/$guid': typeof ParentGuidRoute
   '/admin': typeof AdminIndexRoute
+  '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid': typeof ParentGuidIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,14 +148,17 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/admin/banquet': typeof AdminBanquetRoute
   '/admin/buyouts': typeof AdminBuyoutsRoute
+  '/admin/dinner-notes': typeof AdminDinnerNotesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/invites': typeof AdminInvitesRoute
   '/admin/meetings': typeof AdminMeetingsRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
-  '/parent/$guid': typeof ParentGuidRoute
+  '/parent/$guid': typeof ParentGuidRouteWithChildren
   '/admin/': typeof AdminIndexRoute
+  '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid/': typeof ParentGuidIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -142,6 +168,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/banquet'
     | '/admin/buyouts'
+    | '/admin/dinner-notes'
     | '/admin/emails'
     | '/admin/invites'
     | '/admin/meetings'
@@ -150,20 +177,24 @@ export interface FileRouteTypes {
     | '/admin/students'
     | '/parent/$guid'
     | '/admin/'
+    | '/parent/$guid/ideas'
+    | '/parent/$guid/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/admin/banquet'
     | '/admin/buyouts'
+    | '/admin/dinner-notes'
     | '/admin/emails'
     | '/admin/invites'
     | '/admin/meetings'
     | '/admin/overview'
     | '/admin/settings'
     | '/admin/students'
-    | '/parent/$guid'
     | '/admin'
+    | '/parent/$guid/ideas'
+    | '/parent/$guid'
   id:
     | '__root__'
     | '/'
@@ -171,6 +202,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/banquet'
     | '/admin/buyouts'
+    | '/admin/dinner-notes'
     | '/admin/emails'
     | '/admin/invites'
     | '/admin/meetings'
@@ -179,13 +211,15 @@ export interface FileRouteTypes {
     | '/admin/students'
     | '/parent/$guid'
     | '/admin/'
+    | '/parent/$guid/ideas'
+    | '/parent/$guid/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
-  ParentGuidRoute: typeof ParentGuidRoute
+  ParentGuidRoute: typeof ParentGuidRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -267,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmailsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dinner-notes': {
+      id: '/admin/dinner-notes'
+      path: '/dinner-notes'
+      fullPath: '/admin/dinner-notes'
+      preLoaderRoute: typeof AdminDinnerNotesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/buyouts': {
       id: '/admin/buyouts'
       path: '/buyouts'
@@ -281,12 +322,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBanquetRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/parent/$guid/': {
+      id: '/parent/$guid/'
+      path: '/'
+      fullPath: '/parent/$guid/'
+      preLoaderRoute: typeof ParentGuidIndexRouteImport
+      parentRoute: typeof ParentGuidRoute
+    }
+    '/parent/$guid/ideas': {
+      id: '/parent/$guid/ideas'
+      path: '/ideas'
+      fullPath: '/parent/$guid/ideas'
+      preLoaderRoute: typeof ParentGuidIdeasRouteImport
+      parentRoute: typeof ParentGuidRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
   AdminBanquetRoute: typeof AdminBanquetRoute
   AdminBuyoutsRoute: typeof AdminBuyoutsRoute
+  AdminDinnerNotesRoute: typeof AdminDinnerNotesRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminInvitesRoute: typeof AdminInvitesRoute
   AdminMeetingsRoute: typeof AdminMeetingsRoute
@@ -299,6 +355,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminBanquetRoute: AdminBanquetRoute,
   AdminBuyoutsRoute: AdminBuyoutsRoute,
+  AdminDinnerNotesRoute: AdminDinnerNotesRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminInvitesRoute: AdminInvitesRoute,
   AdminMeetingsRoute: AdminMeetingsRoute,
@@ -310,11 +367,25 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface ParentGuidRouteChildren {
+  ParentGuidIdeasRoute: typeof ParentGuidIdeasRoute
+  ParentGuidIndexRoute: typeof ParentGuidIndexRoute
+}
+
+const ParentGuidRouteChildren: ParentGuidRouteChildren = {
+  ParentGuidIdeasRoute: ParentGuidIdeasRoute,
+  ParentGuidIndexRoute: ParentGuidIndexRoute,
+}
+
+const ParentGuidRouteWithChildren = ParentGuidRoute._addFileChildren(
+  ParentGuidRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
-  ParentGuidRoute: ParentGuidRoute,
+  ParentGuidRoute: ParentGuidRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

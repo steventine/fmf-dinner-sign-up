@@ -403,20 +403,26 @@ function TransactionalEditor({ template }: { template: Template }) {
   const updateReminderDays = useServerFn(adminUpdateReminderDays);
   const previewHeartbeat = useServerFn(adminPreviewReminderHeartbeat);
   const previewBanquetHeartbeat = useServerFn(adminPreviewBanquetReminderHeartbeat);
+  const isFollowup = template.key === "dinner_followup";
   const isReminderTemplate =
-    template.key === "dinner_reminder" || template.key === "banquet_reminder";
+    template.key === "dinner_reminder" || template.key === "banquet_reminder" || isFollowup;
+  // The follow-up counts forward from the meeting; the reminders count back to it.
+  const configuredDays = isFollowup ? template.follow_up_days_after : template.reminder_days_before;
+  const defaultDays = isFollowup ? 1 : 3;
   const qc = useQueryClient();
 
   const [subject, setSubject] = useState(template.subject);
   const [markdownBody, setMarkdownBody] = useState(template.markdown_body);
   const [testEmail, setTestEmail] = useState("");
-  const [reminderDays, setReminderDays] = useState(String(template.reminder_days_before ?? 3));
+  const [reminderEnabled, setReminderEnabled] = useState(configuredDays != null);
+  const [reminderDays, setReminderDays] = useState(String(configuredDays ?? defaultDays));
   const [previewDate, setPreviewDate] = useState(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     setSubject(template.subject);
     setMarkdownBody(template.markdown_body);
-    setReminderDays(String(template.reminder_days_before ?? 3));
+    setReminderEnabled(configuredDays != null);
+    setReminderDays(String(configuredDays ?? defaultDays));
   }, [template.key]);
 
   useEffect(() => {
@@ -430,7 +436,11 @@ function TransactionalEditor({ template }: { template: Template }) {
   }, []);
 
   const isDirty = subject !== template.subject || markdownBody !== template.markdown_body;
-  const isReminderDirty = reminderDays !== String(template.reminder_days_before ?? 3);
+  const parsedDays = parseInt(reminderDays, 10);
+  // Null = turned off, which is exactly what the heartbeats check for.
+  const nextDays = reminderEnabled && Number.isFinite(parsedDays) ? parsedDays : null;
+  const isReminderDirty = nextDays !== (configuredDays ?? null);
+  const isReminderInvalid = reminderEnabled && !Number.isFinite(parsedDays);
 
   const save = useMutation({
     mutationFn: () => update({ data: { key: template.key, subject, markdown_body: markdownBody } }),
@@ -445,8 +455,8 @@ function TransactionalEditor({ template }: { template: Template }) {
     mutationFn: () =>
       updateReminderDays({
         data: {
-          key: template.key as "dinner_reminder" | "banquet_reminder",
-          days: parseInt(reminderDays, 10),
+          key: template.key as "dinner_reminder" | "banquet_reminder" | "dinner_followup",
+          days: nextDays,
         },
       }),
     onSuccess: () => {
@@ -519,11 +529,34 @@ function TransactionalEditor({ template }: { template: Template }) {
 
       {isReminderTemplate && (
         <Card className="space-y-4 p-6">
-          <h3 className="font-semibold">Reminder settings</h3>
-          <div className="flex items-end gap-3">
+          <h3 className="font-semibold">
+            {isFollowup ? "Follow-up settings" : "Reminder settings"}
+          </h3>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+            <div>
+              <Label htmlFor="reminder-enabled" className="font-medium">
+                Enabled
+              </Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isFollowup
+                  ? "Turn this off to stop asking households to share what they brought."
+                  : "Turn this off to stop these automatic emails without deleting the template."}
+              </p>
+            </div>
+            <Switch
+              id="reminder-enabled"
+              checked={reminderEnabled}
+              onCheckedChange={setReminderEnabled}
+            />
+          </div>
+
+          {reminderEnabled && (
             <div className="space-y-2">
               <Label htmlFor="reminder-days">
-                Days before {template.key === "banquet_reminder" ? "banquet" : "meeting"}
+                {isFollowup
+                  ? "Days after meeting"
+                  : `Days before ${template.key === "banquet_reminder" ? "banquet" : "meeting"}`}
               </Label>
               <Input
                 id="reminder-days"
@@ -535,18 +568,28 @@ function TransactionalEditor({ template }: { template: Template }) {
                 onChange={(e) => setReminderDays(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                {template.key === "banquet_reminder"
-                  ? "Attending households are emailed this many days before the banquet."
-                  : "Parents are emailed this many days before their signed-up meeting."}
+                {isFollowup
+                  ? "Households that provided dinner are asked to share what they brought this many days after their meeting. Each sign-up is only ever asked once."
+                  : template.key === "banquet_reminder"
+                    ? "Attending households are emailed this many days before the banquet."
+                    : "Parents are emailed this many days before their signed-up meeting."}
               </p>
+              {isReminderInvalid && (
+                <p className="text-sm text-destructive">Enter a number of days between 1 and 30.</p>
+              )}
             </div>
-          </div>
+          )}
+
           <Button
             variant="outline"
             onClick={() => saveReminder.mutate()}
-            disabled={!isReminderDirty || saveReminder.isPending}
+            disabled={!isReminderDirty || isReminderInvalid || saveReminder.isPending}
           >
-            {saveReminder.isPending ? "Saving…" : "Save reminder settings"}
+            {saveReminder.isPending
+              ? "Saving…"
+              : isFollowup
+                ? "Save follow-up settings"
+                : "Save reminder settings"}
           </Button>
         </Card>
       )}

@@ -91,11 +91,13 @@ export default {
         runScheduledEmailHeartbeat,
         runMeetingReminderHeartbeat,
         runBanquetReminderHeartbeat,
+        runDinnerFollowupHeartbeat,
       } = await import("./lib/email-scheduler.server");
       await Promise.all([
         runScheduledEmailHeartbeat(),
         runMeetingReminderHeartbeat(),
         runBanquetReminderHeartbeat(),
+        runDinnerFollowupHeartbeat(),
       ]);
     } catch (error) {
       console.error("Scheduled heartbeat failed:", error);

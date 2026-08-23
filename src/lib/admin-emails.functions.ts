@@ -28,7 +28,7 @@ export const adminListEmailTemplates = createServerFn({ method: "POST" }).handle
   const { data, error } = await supabaseAdmin
     .from("email_templates")
     .select(
-      "key, name, description, subject, markdown_body, available_variables, template_type, audience_type, schedule_enabled, schedule_cron, schedule_next_run_at, schedule_last_run_at, reminder_days_before, updated_at",
+      "key, name, description, subject, markdown_body, available_variables, template_type, audience_type, schedule_enabled, schedule_cron, schedule_next_run_at, schedule_last_run_at, reminder_days_before, follow_up_days_after, updated_at",
     )
     .order("name");
   if (error) throw new Error(error.message);
@@ -276,21 +276,24 @@ export const adminGetAllSendLog = createServerFn({ method: "POST" })
     return { logs: logs ?? [], hasMore: (logs?.length ?? 0) === data.limit };
   });
 
+// A null day count disables the send entirely — that is how the "Enabled" switch
+// in the email tab turns each of these off.
 export const adminUpdateReminderDays = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
-        key: z.enum(["dinner_reminder", "banquet_reminder"]),
-        days: z.number().int().min(1).max(30),
+        key: z.enum(["dinner_reminder", "banquet_reminder", "dinner_followup"]),
+        days: z.number().int().min(1).max(30).nullable(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const { error } = await supabaseAdmin
-      .from("email_templates")
-      .update({ reminder_days_before: data.days })
-      .eq("key", data.key);
+    const patch =
+      data.key === "dinner_followup"
+        ? { follow_up_days_after: data.days }
+        : { reminder_days_before: data.days };
+    const { error } = await supabaseAdmin.from("email_templates").update(patch).eq("key", data.key);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

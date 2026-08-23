@@ -253,6 +253,134 @@ export type Database = {
           },
         ];
       };
+      dinner_note_votes: {
+        Row: {
+          created_at: string;
+          note_id: string;
+          parent_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          note_id: string;
+          parent_id: string;
+        };
+        Update: {
+          created_at?: string;
+          note_id?: string;
+          parent_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dinner_note_votes_note_id_fkey";
+            columns: ["note_id"];
+            isOneToOne: false;
+            referencedRelation: "dinner_notes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dinner_note_votes_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "parents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dinner_notes: {
+        Row: {
+          body: string;
+          created_at: string;
+          hidden_at: string | null;
+          hidden_by: string | null;
+          id: string;
+          parent_id: string | null;
+          served_count: number | null;
+          source_id: string;
+          total_cost: number | null;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          hidden_at?: string | null;
+          hidden_by?: string | null;
+          id?: string;
+          parent_id?: string | null;
+          served_count?: number | null;
+          source_id: string;
+          total_cost?: number | null;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          hidden_at?: string | null;
+          hidden_by?: string | null;
+          id?: string;
+          parent_id?: string | null;
+          served_count?: number | null;
+          source_id?: string;
+          total_cost?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dinner_notes_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "parents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dinner_notes_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "dinner_sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dinner_sources: {
+        Row: {
+          created_at: string;
+          created_by_parent_id: string | null;
+          delivers: boolean | null;
+          id: string;
+          kind: string;
+          name: string;
+          order_lead_time: string | null;
+          phone: string | null;
+          website: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by_parent_id?: string | null;
+          delivers?: boolean | null;
+          id?: string;
+          kind: string;
+          name: string;
+          order_lead_time?: string | null;
+          phone?: string | null;
+          website?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by_parent_id?: string | null;
+          delivers?: boolean | null;
+          id?: string;
+          kind?: string;
+          name?: string;
+          order_lead_time?: string | null;
+          phone?: string | null;
+          website?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dinner_sources_created_by_parent_id_fkey";
+            columns: ["created_by_parent_id"];
+            isOneToOne: false;
+            referencedRelation: "parents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       email_send_log: {
         Row: {
           id: string;
@@ -319,6 +447,7 @@ export type Database = {
           markdown_body: string;
           name: string;
           reminder_days_before: number | null;
+          follow_up_days_after: number | null;
           schedule_cron: string | null;
           schedule_enabled: boolean;
           schedule_last_run_at: string | null;
@@ -336,6 +465,7 @@ export type Database = {
           markdown_body: string;
           name: string;
           reminder_days_before?: number | null;
+          follow_up_days_after?: number | null;
           schedule_cron?: string | null;
           schedule_enabled?: boolean;
           schedule_last_run_at?: string | null;
@@ -353,6 +483,7 @@ export type Database = {
           markdown_body?: string;
           name?: string;
           reminder_days_before?: number | null;
+          follow_up_days_after?: number | null;
           schedule_cron?: string | null;
           schedule_enabled?: boolean;
           schedule_last_run_at?: string | null;
@@ -465,6 +596,7 @@ export type Database = {
           cancelled_at: string | null;
           created_at: string;
           dinner: string | null;
+          followed_up_at: string | null;
           id: string;
           meeting_id: string;
           parent_id: string;
@@ -475,6 +607,7 @@ export type Database = {
           cancelled_at?: string | null;
           created_at?: string;
           dinner?: string | null;
+          followed_up_at?: string | null;
           id?: string;
           meeting_id: string;
           parent_id: string;
@@ -485,6 +618,7 @@ export type Database = {
           cancelled_at?: string | null;
           created_at?: string;
           dinner?: string | null;
+          followed_up_at?: string | null;
           id?: string;
           meeting_id?: string;
           parent_id?: string;
