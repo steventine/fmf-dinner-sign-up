@@ -357,6 +357,8 @@ export const adminUpdateSettings = createServerFn({ method: "POST" })
         default_dinners_required: z.number().int().min(0).max(50).optional(),
         buyout_price: z.number().min(0).max(10000).optional(),
         app_url: z.string().max(255).optional(),
+        dinner_guidance: z.string().max(4000).optional(),
+        dinner_guidance_short: z.string().max(500).optional(),
       })
       .parse(input),
   )

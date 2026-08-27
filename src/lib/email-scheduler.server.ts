@@ -231,10 +231,11 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
 
   const { data: settings } = await supabaseAdmin
     .from("settings")
-    .select("app_url")
+    .select("app_url, dinner_guidance_short")
     .eq("id", 1)
     .single();
   const appUrl = settings?.app_url ?? "";
+  const guidance = settings?.dinner_guidance_short ?? "";
 
   const todayStr = teamToday();
   const cutoffStr = addDays(todayStr, tpl.reminder_days_before);
@@ -284,6 +285,8 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
       meeting_date: meetingDate,
       dinner: su.dinner ?? "",
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
+      // Edited on /admin/settings; the template chooses whether to include it.
+      dinner_guidance: guidance,
     };
 
     pending.push({ signUpId: su.id, parentId: su.parent_id });
@@ -317,6 +320,116 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
     await supabaseAdmin
       .from("sign_ups")
       .update({ reminded_at: new Date().toISOString() })
+      .in("id", sentSignUpIds);
+  }
+}
+
+// Asks the household that provided dinner to share what they brought, N days after
+// the meeting. Only sign-ups from the recent window are considered: without that
+// bound, enabling this would email every household that has ever served.
+const FOLLOWUP_LOOKBACK_DAYS = 14;
+
+export async function runDinnerFollowupHeartbeat(): Promise<void> {
+  if (teamHour() < REMINDER_SEND_HOUR) return;
+
+  const { data: tpl } = await supabaseAdmin
+    .from("email_templates")
+    .select("subject, markdown_body, follow_up_days_after")
+    .eq("key", "dinner_followup")
+    .single();
+
+  // NULL means the admin turned the follow-up off.
+  if (!tpl?.follow_up_days_after) return;
+
+  const { data: settings } = await supabaseAdmin
+    .from("settings")
+    .select("app_url")
+    .eq("id", 1)
+    .single();
+  const appUrl = settings?.app_url ?? "";
+
+  const todayStr = teamToday();
+  const dueBy = addDays(todayStr, -tpl.follow_up_days_after);
+  const windowStart = addDays(dueBy, -FOLLOWUP_LOOKBACK_DAYS);
+
+  const { data: pastMeetings } = await supabaseAdmin
+    .from("meetings")
+    .select("id, date")
+    .gte("date", windowStart)
+    .lte("date", dueBy);
+
+  if (!pastMeetings?.length) return;
+
+  const meetingDateById = new Map(pastMeetings.map((m) => [m.id, m.date]));
+
+  const { data: signUps } = await supabaseAdmin
+    .from("sign_ups")
+    .select("id, meeting_id, dinner, parent_id, parents(name, email, unique_guid), students(name)")
+    .in(
+      "meeting_id",
+      pastMeetings.map((m) => m.id),
+    )
+    .is("cancelled_at", null)
+    .is("followed_up_at", null);
+
+  if (!signUps?.length) return;
+
+  const pending: { signUpId: string; parentId: string }[] = [];
+  const emails: { to: string; subject: string; html: string }[] = [];
+
+  for (const su of signUps) {
+    const parent = Array.isArray(su.parents) ? su.parents[0] : su.parents;
+    const student = Array.isArray(su.students) ? su.students[0] : su.students;
+    if (!parent || !student) continue;
+
+    const rawDate = meetingDateById.get(su.meeting_id);
+    if (!rawDate) continue;
+    const meetingDate = new Date(rawDate + "T12:00:00Z").toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+
+    const variables: Record<string, string> = {
+      parent_name: parent.name,
+      student_name: student.name,
+      meeting_date: meetingDate,
+      dinner: su.dinner ?? "",
+      // Straight to the Dinner ideas tab — the whole point of the email.
+      link_url: `${appUrl}/parent/${parent.unique_guid}/ideas`,
+    };
+
+    pending.push({ signUpId: su.id, parentId: su.parent_id });
+    emails.push({
+      to: parent.email,
+      subject: renderTemplateString(tpl.subject, variables),
+      html: renderEmailHtml(tpl.markdown_body, variables),
+    });
+  }
+
+  if (!pending.length) return;
+
+  const results = await sendEmailBatchViaResend(emails);
+  // Stamped only on success, so exactly one ask per dinner and failures retry.
+  const sentSignUpIds = pending
+    .filter((_, i) => results[i].status === "sent")
+    .map((p) => p.signUpId);
+
+  await supabaseAdmin.from("email_send_log").insert(
+    pending.map((p, i) => ({
+      template_key: "dinner_followup",
+      parent_id: p.parentId,
+      triggered_by: "schedule",
+      status: results[i].status,
+      error_message: results[i].errorMessage,
+      resend_email_id: results[i].emailId,
+    })),
+  );
+
+  if (sentSignUpIds.length > 0) {
+    await supabaseAdmin
+      .from("sign_ups")
+      .update({ followed_up_at: new Date().toISOString() })
       .in("id", sentSignUpIds);
   }
 }
