@@ -18,6 +18,8 @@ const SAMPLE_VARIABLES: Record<string, string> = {
   banquet_location: "Xavier High School cafeteria",
   banquet_notes: "Doors open at 5:30 for setup volunteers.",
   guest_count: "3",
+  dinner_guidance:
+    "Dinner comes to Xavier at 6pm and should include a main entree. Ask your student for the Slack headcount, and bring a little extra.",
   items: "- **Entree** — Lasagna\n- **Desserts** — Brownies",
 };
 
@@ -341,7 +343,7 @@ export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
 
     const { data: settings } = await supabaseAdmin
       .from("settings")
-      .select("app_url")
+      .select("app_url, dinner_guidance_short")
       .eq("id", 1)
       .single();
     const appUrl = settings?.app_url ?? "";
@@ -363,6 +365,7 @@ export const adminPreviewReminderHeartbeat = createServerFn({ method: "POST" })
         meeting_date: meetingDate,
         dinner: su.dinner ?? "",
         link_url: `${appUrl}/parent/${parent.unique_guid}`,
+        dinner_guidance: settings?.dinner_guidance_short ?? "",
       };
       return [
         {
@@ -452,10 +455,20 @@ export const adminSendTestEmail = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await requireAdminUserId();
+    const { data: settings } = await supabaseAdmin
+      .from("settings")
+      .select("dinner_guidance_short")
+      .eq("id", 1)
+      .single();
     await renderAndSendTemplate({
       key: data.key,
       to: data.to,
-      variables: SAMPLE_VARIABLES,
+      variables: {
+        ...SAMPLE_VARIABLES,
+        ...(settings?.dinner_guidance_short
+          ? { dinner_guidance: settings.dinner_guidance_short }
+          : {}),
+      },
     });
     return { ok: true };
   });

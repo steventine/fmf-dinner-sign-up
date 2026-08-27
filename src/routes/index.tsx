@@ -140,14 +140,11 @@ function PublicCalendarPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               Team Dinner Sign-up
             </h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base my-[9px]">
-              Please bring your dinner to Xavier at 6pm. Dinner should include a main entree; a side
-              or dessert is nice but optional. Some possible main entrees include Illiano’s pizza,
-              Big Y sandwiches or pizza, and homemade dishes (grilled chicken, pasta, hot dogs,
-              tacos, BBQ). You should ask your student to check Slack to see how many people have
-              signed up for the meeting, and it is suggested that you bring a little extra as there
-              will be people who forget to sign up.
-            </p>
+            {data?.guidance && (
+              <p className="my-[9px] mt-3 max-w-2xl whitespace-pre-line text-sm text-muted-foreground sm:text-base">
+                {data.guidance}
+              </p>
+            )}
           </div>
           <Dialog open={signInOpen} onOpenChange={setSignInOpen}>
             <DialogTrigger asChild>

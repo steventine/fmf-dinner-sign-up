@@ -24,6 +24,7 @@ import { Route as AdminDinnerNotesRouteImport } from './routes/admin.dinner-note
 import { Route as AdminBuyoutsRouteImport } from './routes/admin.buyouts'
 import { Route as AdminBanquetRouteImport } from './routes/admin.banquet'
 import { Route as ParentGuidIndexRouteImport } from './routes/parent.$guid.index'
+import { Route as ParentGuidStudentsRouteImport } from './routes/parent.$guid.students'
 import { Route as ParentGuidIdeasRouteImport } from './routes/parent.$guid.ideas'
 
 const LoginRoute = LoginRouteImport.update({
@@ -101,6 +102,11 @@ const ParentGuidIndexRoute = ParentGuidIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ParentGuidRoute,
 } as any)
+const ParentGuidStudentsRoute = ParentGuidStudentsRouteImport.update({
+  id: '/students',
+  path: '/students',
+  getParentRoute: () => ParentGuidRoute,
+} as any)
 const ParentGuidIdeasRoute = ParentGuidIdeasRouteImport.update({
   id: '/ideas',
   path: '/ideas',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/parent/$guid': typeof ParentGuidRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid/students': typeof ParentGuidStudentsRoute
   '/parent/$guid/': typeof ParentGuidIndexRoute
 }
 export interface FileRoutesByTo {
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/admin/students': typeof AdminStudentsRoute
   '/admin': typeof AdminIndexRoute
   '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid/students': typeof ParentGuidStudentsRoute
   '/parent/$guid': typeof ParentGuidIndexRoute
 }
 export interface FileRoutesById {
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/parent/$guid': typeof ParentGuidRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/parent/$guid/ideas': typeof ParentGuidIdeasRoute
+  '/parent/$guid/students': typeof ParentGuidStudentsRoute
   '/parent/$guid/': typeof ParentGuidIndexRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/parent/$guid'
     | '/admin/'
     | '/parent/$guid/ideas'
+    | '/parent/$guid/students'
     | '/parent/$guid/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/admin/students'
     | '/admin'
     | '/parent/$guid/ideas'
+    | '/parent/$guid/students'
     | '/parent/$guid'
   id:
     | '__root__'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/parent/$guid'
     | '/admin/'
     | '/parent/$guid/ideas'
+    | '/parent/$guid/students'
     | '/parent/$guid/'
   fileRoutesById: FileRoutesById
 }
@@ -329,6 +341,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ParentGuidIndexRouteImport
       parentRoute: typeof ParentGuidRoute
     }
+    '/parent/$guid/students': {
+      id: '/parent/$guid/students'
+      path: '/students'
+      fullPath: '/parent/$guid/students'
+      preLoaderRoute: typeof ParentGuidStudentsRouteImport
+      parentRoute: typeof ParentGuidRoute
+    }
     '/parent/$guid/ideas': {
       id: '/parent/$guid/ideas'
       path: '/ideas'
@@ -369,11 +388,13 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface ParentGuidRouteChildren {
   ParentGuidIdeasRoute: typeof ParentGuidIdeasRoute
+  ParentGuidStudentsRoute: typeof ParentGuidStudentsRoute
   ParentGuidIndexRoute: typeof ParentGuidIndexRoute
 }
 
 const ParentGuidRouteChildren: ParentGuidRouteChildren = {
   ParentGuidIdeasRoute: ParentGuidIdeasRoute,
+  ParentGuidStudentsRoute: ParentGuidStudentsRoute,
   ParentGuidIndexRoute: ParentGuidIndexRoute,
 }
 

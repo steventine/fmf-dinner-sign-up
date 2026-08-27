@@ -231,10 +231,11 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
 
   const { data: settings } = await supabaseAdmin
     .from("settings")
-    .select("app_url")
+    .select("app_url, dinner_guidance_short")
     .eq("id", 1)
     .single();
   const appUrl = settings?.app_url ?? "";
+  const guidance = settings?.dinner_guidance_short ?? "";
 
   const todayStr = teamToday();
   const cutoffStr = addDays(todayStr, tpl.reminder_days_before);
@@ -284,6 +285,8 @@ export async function runMeetingReminderHeartbeat(): Promise<void> {
       meeting_date: meetingDate,
       dinner: su.dinner ?? "",
       link_url: `${appUrl}/parent/${parent.unique_guid}`,
+      // Edited on /admin/settings; the template chooses whether to include it.
+      dinner_guidance: guidance,
     };
 
     pending.push({ signUpId: su.id, parentId: su.parent_id });

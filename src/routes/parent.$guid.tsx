@@ -71,6 +71,14 @@ function ParentLayout() {
             >
               Dinner ideas
             </Link>
+            <Link
+              to="/parent/$guid/students"
+              params={{ guid }}
+              activeProps={{ className: "active" }}
+              className={tabClass}
+            >
+              Student summary
+            </Link>
           </nav>
         </div>
       </header>

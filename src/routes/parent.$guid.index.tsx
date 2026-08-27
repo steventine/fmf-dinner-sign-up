@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cancelSignUp, requestBuyOut, signUpForMeeting } from "@/lib/parent.functions";
 import { MeetingCalendar, type MySignUp } from "@/components/MeetingCalendar";
 import { BanquetCard } from "@/components/BanquetCard";
+import { DinnerGuidance } from "@/components/DinnerGuidance";
 import { DinnerIdeasPeek } from "@/components/DinnerIdeas";
 import { useDinnerIdeas, type DinnerSource } from "@/hooks/use-dinner-ideas";
 import { parentQueryKey, useParentContext } from "@/hooks/use-parent-context";
@@ -135,6 +136,16 @@ function ParentDinners() {
             </div>
           )}
         </Card>
+
+        <DinnerGuidance text={data.guidance}>
+          <Link
+            to="/parent/$guid/ideas"
+            params={{ guid }}
+            className="inline-block text-sm text-primary underline underline-offset-2"
+          >
+            See what other families brought
+          </Link>
+        </DinnerGuidance>
 
         <MeetingCalendar
           meetings={meetings as MeetingRow[]}

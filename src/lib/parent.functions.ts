@@ -45,7 +45,7 @@ export const getParentContext = createServerFn({ method: "POST" })
         .select("id, season_year, amount, dinners, requested_at, approved, approved_at")
         .eq("student_id", parent.student_id)
         .order("requested_at", { ascending: false }),
-      supabaseAdmin.from("settings").select("buyout_price").eq("id", 1).single(),
+      supabaseAdmin.from("settings").select("buyout_price, dinner_guidance").eq("id", 1).single(),
     ]);
     if (hhErr) throw new Error(hhErr.message);
     if (mErr) throw new Error(mErr.message);
@@ -62,6 +62,7 @@ export const getParentContext = createServerFn({ method: "POST" })
       mySignUps: mySignUps ?? [],
       buyOuts: buyOuts ?? [],
       buyoutPrice: Number(settingsRow.buyout_price),
+      guidance: settingsRow.dinner_guidance ?? "",
     };
   });
 

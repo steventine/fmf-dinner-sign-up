@@ -28,7 +28,19 @@ export const getPublicSchedule = createServerFn({ method: "GET" }).handler(async
   const activeBanquet = await getActiveBanquet();
   const banquet = activeBanquet ? await getBanquetSummary(activeBanquet) : null;
 
-  return { meetings: meetings ?? [], households, season, banquet };
+  const { data: settingsRow } = await supabaseAdmin
+    .from("settings")
+    .select("dinner_guidance")
+    .eq("id", 1)
+    .single();
+
+  return {
+    meetings: meetings ?? [],
+    households,
+    season,
+    banquet,
+    guidance: settingsRow?.dinner_guidance ?? "",
+  };
 });
 
 export const requestParentLink = createServerFn({ method: "POST" })

@@ -565,6 +565,8 @@ export type Database = {
         Row: {
           app_url: string;
           buyout_price: number;
+          dinner_guidance: string;
+          dinner_guidance_short: string;
           default_dinners_required: number;
           id: number;
           season_end: string | null;
@@ -574,6 +576,8 @@ export type Database = {
         Insert: {
           app_url?: string;
           buyout_price?: number;
+          dinner_guidance?: string;
+          dinner_guidance_short?: string;
           default_dinners_required?: number;
           id?: number;
           season_end?: string | null;
@@ -583,6 +587,8 @@ export type Database = {
         Update: {
           app_url?: string;
           buyout_price?: number;
+          dinner_guidance?: string;
+          dinner_guidance_short?: string;
           default_dinners_required?: number;
           id?: number;
           season_end?: string | null;
