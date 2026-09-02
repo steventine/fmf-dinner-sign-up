@@ -9,7 +9,9 @@ export type HouseholdProgress = {
 export type Status = "fulfilled" | "pending" | "partial" | "none";
 
 export function getStatus(p: HouseholdProgress): Status {
-  if (p.provided >= p.required && p.required > 0) return "fulfilled";
+  // A household set to 0 dinners required (admins, staff) has nothing left to
+  // do, so 0 >= 0 lands it in "fulfilled" like anyone else who is done.
+  if (p.provided >= p.required) return "fulfilled";
   if (p.provided + p.pending_buyouts >= p.required && p.pending_buyouts > 0)
     return "pending";
   if (p.provided > 0) return "partial";
