@@ -66,11 +66,25 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+// Cloudflare redacts any run of 32+ hex digits from the request URL in invocation
+// logs, so parent visits all show up as `GET /parent/REDACTED`. Our own console
+// output isn't redacted — emit a short GUID prefix so visits are attributable in
+// the log without leaving a usable sign-up link in it.
+function logParentVisit(request: Request, url: URL): void {
+  if (request.method !== "GET") return;
+  const match = /^\/parent\/([0-9a-f]{8})[0-9a-f-]*(\/[a-z-]*)?$/i.exec(url.pathname);
+  if (!match) return;
+  const page = match[2]?.slice(1) || "index";
+  console.log(JSON.stringify({ event: "parent_visit", guidPrefix: match[1], page }));
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       // Resend delivery webhooks are handled directly, outside the app router.
       const url = new URL(request.url);
+      logParentVisit(request, url);
+
       if (url.pathname === "/api/webhooks/resend" && request.method === "POST") {
         const { handleResendWebhook } = await import("./lib/resend-webhook.server");
         return await handleResendWebhook(request);
