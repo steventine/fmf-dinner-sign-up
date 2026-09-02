@@ -74,8 +74,16 @@ function logParentVisit(request: Request, url: URL): void {
   if (request.method !== "GET") return;
   const match = /^\/parent\/([0-9a-f]{8})[0-9a-f-]*(\/[a-z-]*)?$/i.exec(url.pathname);
   if (!match) return;
+  const guidPrefix = match[1];
   const page = match[2]?.slice(1) || "index";
-  console.log(JSON.stringify({ event: "parent_visit", guidPrefix: match[1], page }));
+  // `message` is what the dashboard renders in its summary column; the sibling
+  // fields are what it indexes for filtering. Log both.
+  console.log({
+    message: `parent visit ${guidPrefix} (${page})`,
+    event: "parent_visit",
+    guidPrefix,
+    page,
+  });
 }
 
 export default {
