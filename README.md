@@ -95,10 +95,6 @@ The same environment variables from `.env` need to be set as secrets in your Clo
 
 ## Resend webhook setup (email delivery tracking)
 
-> **Status: not yet configured.** The code and database are ready; the two steps below
-> are pending. Until they're done, emails send normally but the admin "Recent sends"
-> table shows only `sent`/`failed` with no delivered/bounced status.
-
 The app exposes `POST /api/webhooks/resend`, which records delivery, bounce, and
 complaint events from Resend onto each row in `email_send_log`. Bounced sends show up
 as red badges (with the bounce reason on hover) in the admin **Emails → Recent sends**
@@ -116,8 +112,13 @@ table — this is how you spot bad parent email addresses.
    - `email.bounced`
    - `email.complained`
    - `email.delivery_delayed`
+   - `email.failed`
+   - `email.suppressed`
 
-   (`email.opened` / `email.clicked` are harmlessly ignored if enabled.)
+   (`email.opened` / `email.clicked` are harmlessly ignored if enabled. `email.sent`
+   is redundant — the app already records that at send time. `email.scheduled` and
+   `email.received` never fire here: scheduling runs on the Worker cron rather than
+   Resend's `scheduled_at`, and no mail is received through Resend.)
 4. Copy the endpoint's **signing secret** (starts with `whsec_`).
 
 ### 2. Set the signing secret in Cloudflare
