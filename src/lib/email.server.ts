@@ -7,7 +7,7 @@ export function markdownToEmailHtml(markdown: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;line-height:1.5">${body}</body></html>`;
 }
 
-const DEFAULT_FROM = "FullMetal Falcons Dinners <dinners@fmf.tinefamily.com>";
+const DEFAULT_FROM = "FullMetal Falcons Admin <helen@tinefamily.com>";
 
 // Resend returns { id } for single sends and { data: [{ id }] } for batches;
 // we store the id on email_send_log so delivery webhooks can find the row.
