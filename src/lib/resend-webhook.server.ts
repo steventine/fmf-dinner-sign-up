@@ -24,6 +24,23 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Thrown when RESEND_WEBHOOK_SECRET itself is unusable, so the response can say
+// so plainly instead of surfacing an opaque 500 to Svix.
+class WebhookConfigError extends Error {}
+
+// The Svix secret is base64 after the "whsec_" prefix. A mis-pasted value makes
+// atob throw, which is a configuration problem, not a bad request.
+function decodeSigningSecret(secret: string): Uint8Array<ArrayBuffer> {
+  const raw = secret.replace(/^whsec_/, "").trim();
+  try {
+    return Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+  } catch {
+    throw new WebhookConfigError(
+      "RESEND_WEBHOOK_SECRET is not valid base64 - re-copy the whsec_ signing secret from the Resend webhook endpoint",
+    );
+  }
+}
+
 async function verifySvixSignature(
   secret: string,
   svixId: string,
@@ -31,7 +48,7 @@ async function verifySvixSignature(
   svixSignature: string,
   body: string,
 ): Promise<boolean> {
-  const secretBytes = Uint8Array.from(atob(secret.replace(/^whsec_/, "")), (c) => c.charCodeAt(0));
+  const secretBytes = decodeSigningSecret(secret);
   const key = await crypto.subtle.importKey(
     "raw",
     secretBytes,
@@ -62,7 +79,22 @@ type ResendWebhookEvent = {
   };
 };
 
+// Any throw below would otherwise escape to the worker's catch-all and render the
+// branded HTML error page, which tells us nothing and is opaque to Svix's retries.
 export async function handleResendWebhook(request: Request): Promise<Response> {
+  try {
+    return await routeResendWebhook(request);
+  } catch (error) {
+    if (error instanceof WebhookConfigError) {
+      console.error(`Resend webhook: ${error.message}`);
+      return new Response(error.message, { status: 500 });
+    }
+    console.error("Resend webhook: unhandled error:", error);
+    return new Response("webhook error", { status: 500 });
+  }
+}
+
+async function routeResendWebhook(request: Request): Promise<Response> {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) {
     console.error("RESEND_WEBHOOK_SECRET is not configured");
