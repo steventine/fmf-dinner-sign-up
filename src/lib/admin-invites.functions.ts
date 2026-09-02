@@ -14,9 +14,7 @@ export const adminListInvites = createServerFn({ method: "POST" }).handler(async
 });
 
 export const adminAddInvite = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ email: z.string().email().max(255) }).parse(input),
-  )
+  .inputValidator((input) => z.object({ email: z.string().email().max(255) }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const { error } = await supabaseAdmin
@@ -27,9 +25,7 @@ export const adminAddInvite = createServerFn({ method: "POST" })
   });
 
 export const adminRemoveInvite = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ email: z.string().email().max(255) }).parse(input),
-  )
+  .inputValidator((input) => z.object({ email: z.string().email().max(255) }).parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
     const { error } = await supabaseAdmin

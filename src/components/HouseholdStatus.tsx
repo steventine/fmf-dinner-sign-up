@@ -33,12 +33,8 @@ export function HouseholdStatus({ households }: { households: Household[] }) {
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">
-            Student summary
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Dinners provided so far this season.
-          </p>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Student summary</h2>
+          <p className="text-sm text-muted-foreground">Dinners provided so far this season.</p>
         </div>
         <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
           <Button
@@ -71,12 +67,8 @@ export function HouseholdStatus({ households }: { households: Household[] }) {
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-foreground">
-                    {h.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {progressDetails(h.progress)}
-                  </p>
+                  <p className="truncate font-medium text-foreground">{h.name}</p>
+                  <p className="text-xs text-muted-foreground">{progressDetails(h.progress)}</p>
                 </div>
               </div>
               <span
@@ -88,9 +80,7 @@ export function HouseholdStatus({ households }: { households: Household[] }) {
           );
         })}
         {sorted.length === 0 && (
-          <Card className="p-6 text-center text-sm text-muted-foreground">
-            No households yet.
-          </Card>
+          <Card className="p-6 text-center text-sm text-muted-foreground">No households yet.</Card>
         )}
       </div>
     </section>

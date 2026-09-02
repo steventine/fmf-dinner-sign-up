@@ -1,0 +1,5 @@
+# Normalize line endings: LF in the repository and in every working tree.
+# Prettier (endOfLine defaults to "lf") and the prettier/prettier ESLint rule
+# both expect LF, so without this a Windows checkout with core.autocrlf=true
+# reports every line of every file as a lint error.
+* text=auto eol=lf

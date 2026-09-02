@@ -27,7 +27,9 @@ function LoginPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) afterAuth();
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session) afterAuth();
     });
     return () => subscription.unsubscribe();
@@ -35,7 +37,11 @@ function LoginPage() {
   }, []);
 
   async function afterAuth() {
-    try { await claim({}); } catch {}
+    try {
+      await claim({});
+    } catch {
+      /* best-effort admin bootstrap; the isAdmin check below is authoritative */
+    }
     const r = await isAdmin({});
     if (!r.ok) {
       toast.error("Signed in, but this account is not an admin.");
@@ -90,7 +96,13 @@ function LoginPage() {
           </p>
         </div>
 
-        <Button type="button" variant="outline" className="w-full" onClick={onGoogle} disabled={busy}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={onGoogle}
+          disabled={busy}
+        >
           Continue with Google
         </Button>
         <div className="my-4 flex items-center gap-2 text-xs text-muted-foreground">
@@ -106,11 +118,23 @@ function LoginPage() {
             <form onSubmit={onSignIn} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Signing in…" : "Sign in"}
@@ -121,11 +145,24 @@ function LoginPage() {
             <form onSubmit={onSignUp} className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="email2">Email (must be invited)</Label>
-                <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="email2"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password2">Password</Label>
-                <Input id="password2" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="password2"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Creating…" : "Create account"}
@@ -134,7 +171,9 @@ function LoginPage() {
           </TabsContent>
         </Tabs>
         <div className="mt-6 text-center text-xs text-muted-foreground">
-          <Link to="/" className="hover:underline">← Back to public calendar</Link>
+          <Link to="/" className="hover:underline">
+            ← Back to public calendar
+          </Link>
         </div>
       </Card>
     </div>

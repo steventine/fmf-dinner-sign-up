@@ -5,6 +5,7 @@ Move email templates out of code and into the database so admins can edit subjec
 ## What admins will see
 
 A new **Admin → Emails** page that lists every email the app can send. Clicking one opens an editor with:
+
 - Subject line field
 - HTML body editor (textarea with a live preview pane)
 - List of available variables for that template (e.g. `{{parent_name}}`, `{{link_url}}`)
@@ -20,7 +21,9 @@ Templates use simple `{{variable_name}}` placeholders. Each template declares wh
 ## Plan
 
 ### 1. Database
+
 Create `email_templates` table:
+
 - `key` (text, unique) — stable identifier like `parent_link`, `dinner_reminder`
 - `name` (text) — admin-facing label
 - `description` (text) — what triggers this email
@@ -34,27 +37,33 @@ Admin-only RLS (read + update). No insert/delete from the app — templates are 
 Seed the `parent_link` template with the current HTML from `email.server.ts`.
 
 ### 2. Server-side rendering
+
 Refactor `src/lib/email.server.ts`:
+
 - New `renderAndSendTemplate({ key, to, variables })` that loads the row from the DB, substitutes `{{var}}` placeholders, and calls Resend.
 - Keep `sendEmailViaResend` as the low-level helper.
 - Remove the hardcoded `buildParentLinkEmail` and update `requestParentLink` in `public.functions.ts` to call `renderAndSendTemplate({ key: 'parent_link', ... })`.
 
 ### 3. Admin server functions (`src/lib/admin-emails.functions.ts`)
+
 - `listEmailTemplates()` — admin-only, returns all rows
 - `getEmailTemplate({ key })`
 - `updateEmailTemplate({ key, subject, html_body })`
 - `sendTestEmail({ key })` — renders with placeholder sample values and sends to the logged-in admin
 
 ### 4. Admin UI
+
 - New route `src/routes/admin.emails.tsx` (list + edit in one screen, master/detail layout consistent with other admin pages)
 - Add "Emails" tab to the admin nav in `src/routes/admin.tsx`
 - HTML body: monospace textarea + iframe-based live preview with sample variable values substituted in
 
 ### 5. Wiring
+
 - Update `requestParentLink` to use the new template loader
 - Future emails (reminders, etc.) just need a new seed row + a call site
 
 ## Out of scope
+
 - Rich text / WYSIWYG editor (raw HTML is fine for now; we can add one later)
 - Scheduling/sending reminders automatically (that's a follow-up — this PR only sets up the template system)
 - Versioning / template history

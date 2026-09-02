@@ -10,15 +10,15 @@
   "triggers": {
     // Runs hourly — picks up scheduled email templates and reminders that are due,
     // so campaigns send within an hour of their configured time instead of the next morning.
-    "crons": ["0 * * * *"]
+    "crons": ["0 * * * *"],
   },
   "observability": {
     "logs": {
       "enabled": true,
-      "invocation_logs": true
+      "invocation_logs": true,
     },
     "traces": {
-      "enabled": true
-    }
-  }
+      "enabled": true,
+    },
+  },
 }

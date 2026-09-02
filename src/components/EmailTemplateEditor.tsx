@@ -82,7 +82,9 @@ export function EmailTemplateEditor({
             <span className="font-medium">{previewSubject}</span>
           </div>
           {/* Invisible spacer matching the "Body (Markdown)" label height so the iframe aligns with the textarea */}
-          <Label className="pointer-events-none opacity-0" aria-hidden="true">Body</Label>
+          <Label className="pointer-events-none opacity-0" aria-hidden="true">
+            Body
+          </Label>
           <iframe
             title="Email preview"
             srcDoc={previewHtml}

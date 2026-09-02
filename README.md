@@ -66,12 +66,12 @@ The first user to sign in automatically receives the admin role. Sign in at `/lo
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `bun run dev` | Start dev server with hot reload |
-| `bun run build` | Production build |
-| `bun run lint` | ESLint |
-| `bun run format` | Prettier |
+| Command          | Description                      |
+| ---------------- | -------------------------------- |
+| `bun run dev`    | Start dev server with hot reload |
+| `bun run build`  | Production build                 |
+| `bun run lint`   | ESLint                           |
+| `bun run format` | Prettier                         |
 
 ## Database migrations
 
@@ -119,6 +119,7 @@ table — this is how you spot bad parent email addresses.
    is redundant — the app already records that at send time. `email.scheduled` and
    `email.received` never fire here: scheduling runs on the Worker cron rather than
    Resend's `scheduled_at`, and no mail is received through Resend.)
+
 4. Copy the endpoint's **signing secret** (starts with `whsec_`).
 
 ### 2. Set the signing secret in Cloudflare

@@ -58,9 +58,7 @@ export function MeetingCalendar({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-foreground">
-          Meeting schedule
-        </h2>
+        <h2 className="text-lg font-semibold text-foreground">Meeting schedule</h2>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
           <Switch checked={showPast} onCheckedChange={setShowPast} />
           Show past meetings
@@ -68,9 +66,7 @@ export function MeetingCalendar({
       </div>
 
       {grouped.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
-          No meetings scheduled yet.
-        </Card>
+        <Card className="p-8 text-center text-muted-foreground">No meetings scheduled yet.</Card>
       ) : (
         <div className="space-y-8">
           {grouped.map(({ week, items }) => (
@@ -86,10 +82,7 @@ export function MeetingCalendar({
                   const past = isPast(m.date);
                   const mySignUp = mySignUpByMeeting.get(m.meeting_id);
                   const canCancel =
-                    !!parent &&
-                    !!mySignUp &&
-                    mySignUp.parent_id === parent.id &&
-                    !past;
+                    !!parent && !!mySignUp && mySignUp.parent_id === parent.id && !past;
                   const canSignUp = !!parent && available && !past;
 
                   return (
@@ -109,9 +102,7 @@ export function MeetingCalendar({
                             {formatMeetingDate(m.date)}
                           </div>
                           {m.notes && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {m.notes}
-                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">{m.notes}</div>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -121,9 +112,7 @@ export function MeetingCalendar({
                             householdName={m.household_name}
                           />
                           {m.dinner && (
-                            <div className="text-xs font-medium text-foreground">
-                              🍽 {m.dinner}
-                            </div>
+                            <div className="text-xs font-medium text-foreground">🍽 {m.dinner}</div>
                           )}
                         </div>
                       </div>

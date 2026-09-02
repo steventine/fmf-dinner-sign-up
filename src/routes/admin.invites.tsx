@@ -3,11 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  adminAddInvite,
-  adminListInvites,
-  adminRemoveInvite,
-} from "@/lib/admin-invites.functions";
+import { adminAddInvite, adminListInvites, adminRemoveInvite } from "@/lib/admin-invites.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +27,19 @@ function AdminInvites() {
   const [email, setEmail] = useState("");
   const addMut = useMutation({
     mutationFn: () => add({ data: { email } }),
-    onSuccess: () => { invalidate(); setEmail(""); toast.success("Invited"); },
+    onSuccess: () => {
+      invalidate();
+      setEmail("");
+      toast.success("Invited");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const rmMut = useMutation({
     mutationFn: (e: string) => remove({ data: { email: e } }),
-    onSuccess: () => { invalidate(); toast.success("Removed"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Removed");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -52,7 +55,10 @@ function AdminInvites() {
       <Card className="p-4">
         <form
           className="flex flex-wrap items-end gap-3"
-          onSubmit={(e) => { e.preventDefault(); if (email) addMut.mutate(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (email) addMut.mutate();
+          }}
         >
           <div className="flex-1 min-w-[240px]">
             <label className="text-xs text-muted-foreground">Email to invite</label>
@@ -64,7 +70,9 @@ function AdminInvites() {
               placeholder="person@example.com"
             />
           </div>
-          <Button type="submit" disabled={!email || addMut.isPending}>Invite</Button>
+          <Button type="submit" disabled={!email || addMut.isPending}>
+            Invite
+          </Button>
         </form>
       </Card>
 

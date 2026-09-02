@@ -60,23 +60,35 @@ function AdminBuyOuts() {
   const ap = useMutation({
     mutationFn: ({ id, dinners }: { id: string; dinners?: number }) =>
       approve({ data: { buyOutId: id, dinners } }),
-    onSuccess: () => { invalidate(); toast.success("Approved"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Approved");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const rv = useMutation({
     mutationFn: (id: string) => revoke({ data: { buyOutId: id } }),
-    onSuccess: () => { invalidate(); toast.success("Revoked"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Revoked");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const rj = useMutation({
     mutationFn: (id: string) => reject({ data: { buyOutId: id } }),
-    onSuccess: () => { invalidate(); toast.success("Rejected"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Rejected");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const up = useMutation({
     mutationFn: ({ id, dinners }: { id: string; dinners: number }) =>
       update({ data: { buyOutId: id, dinners } }),
-    onSuccess: () => { invalidate(); toast.success("Updated"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Updated");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -111,8 +123,8 @@ function AdminBuyOuts() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Buy-Outs</h1>
         <p className="text-sm text-muted-foreground">
-          Approve requests, or enter a buy-out when a parent sends payment without submitting a request.
-          Current price: ${price.toFixed(2)} per dinner.
+          Approve requests, or enter a buy-out when a parent sends payment without submitting a
+          request. Current price: ${price.toFixed(2)} per dinner.
         </p>
       </div>
 
@@ -124,7 +136,9 @@ function AdminBuyOuts() {
         {isLoading ? (
           <Card className="p-6 text-center text-sm text-muted-foreground">Loading…</Card>
         ) : pending.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted-foreground">No pending requests.</Card>
+          <Card className="p-6 text-center text-sm text-muted-foreground">
+            No pending requests.
+          </Card>
         ) : (
           <Card className="divide-y divide-border">
             {pending.map((b) => (
@@ -133,7 +147,9 @@ function AdminBuyOuts() {
                 row={b}
                 onApprove={(dinners) => ap.mutate({ id: b.id, dinners })}
                 onReject={() => {
-                  if (confirm(`Reject buy-out request for ${b.student?.name}? This cannot be undone.`)) {
+                  if (
+                    confirm(`Reject buy-out request for ${b.student?.name}? This cannot be undone.`)
+                  ) {
                     rj.mutate(b.id);
                   }
                 }}
@@ -145,15 +161,22 @@ function AdminBuyOuts() {
       </section>
 
       <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-medium">If payment has been received from a family but no Pending Request is listed above, enter the Buy-Out here.</h2>
+        <h2 className="text-sm font-medium">
+          If payment has been received from a family but no Pending Request is listed above, enter
+          the Buy-Out here.
+        </h2>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <label className="text-xs text-muted-foreground">Student</label>
             <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select student" />
+              </SelectTrigger>
               <SelectContent>
                 {(students ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -171,16 +194,13 @@ function AdminBuyOuts() {
           <div className="text-sm text-muted-foreground pb-2">
             = <strong>${(newCount * price).toFixed(2)}</strong>
           </div>
-          <Button
-            onClick={() => cr.mutate()}
-            disabled={!studentId || cr.isPending}
-          >
+          <Button onClick={() => cr.mutate()} disabled={!studentId || cr.isPending}>
             Record &amp; approve
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Amount is computed from the configured buy-out price. Recorded buy-outs
-          are attributed to the student's first parent on file and immediately approved.
+          Amount is computed from the configured buy-out price. Recorded buy-outs are attributed to
+          the student's first parent on file and immediately approved.
         </p>
       </Card>
 
@@ -234,7 +254,8 @@ function PendingRow({
       <div>
         <div className="font-medium">{row.student?.name}</div>
         <div className="text-sm text-muted-foreground">
-          Requested by {row.parent?.name} · {new Date(row.requested_at).toLocaleDateString()} · {row.dinners} dinner{row.dinners === 1 ? "" : "s"} · ${Number(row.amount).toFixed(2)}
+          Requested by {row.parent?.name} · {new Date(row.requested_at).toLocaleDateString()} ·{" "}
+          {row.dinners} dinner{row.dinners === 1 ? "" : "s"} · ${Number(row.amount).toFixed(2)}
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -278,7 +299,9 @@ function ApprovedRow({
       <div>
         <div className="font-medium">{row.student?.name}</div>
         <div className="text-sm text-muted-foreground">
-          {row.parent?.name} · approved {row.approved_at ? new Date(row.approved_at).toLocaleDateString() : "—"} · {row.dinners} dinner{row.dinners === 1 ? "" : "s"} · ${Number(row.amount).toFixed(2)}
+          {row.parent?.name} · approved{" "}
+          {row.approved_at ? new Date(row.approved_at).toLocaleDateString() : "—"} · {row.dinners}{" "}
+          dinner{row.dinners === 1 ? "" : "s"} · ${Number(row.amount).toFixed(2)}
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -302,18 +325,37 @@ function ApprovedRow({
             >
               Save
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setDinners(String(row.dinners)); }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false);
+                setDinners(String(row.dinners));
+              }}
+            >
               Cancel
             </Button>
           </>
         ) : (
           <>
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Edit</Button>
-            <Button size="sm" variant="outline" onClick={() => {
-              if (confirm(`Revoke buy-out for ${row.student?.name}? It will be moved back to pending.`)) {
-                onRevoke();
-              }
-            }}>Revoke</Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (
+                  confirm(
+                    `Revoke buy-out for ${row.student?.name}? It will be moved back to pending.`,
+                  )
+                ) {
+                  onRevoke();
+                }
+              }}
+            >
+              Revoke
+            </Button>
           </>
         )}
       </div>

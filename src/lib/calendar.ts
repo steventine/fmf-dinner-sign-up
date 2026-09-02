@@ -36,10 +36,7 @@ export function formatWeekLabel(weekStartIso: string): string {
   const sameMonth = start.getMonth() === end.getMonth();
   const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
   const startStr = start.toLocaleDateString(undefined, fmt);
-  const endStr = end.toLocaleDateString(
-    undefined,
-    sameMonth ? { day: "numeric" } : fmt,
-  );
+  const endStr = end.toLocaleDateString(undefined, sameMonth ? { day: "numeric" } : fmt);
   return `Week of ${startStr} – ${endStr}`;
 }
 

@@ -77,7 +77,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Dinner sign-up app for FullMetal Falcons robotics team" },
       { name: "author", content: "The Tine Family" },
       { property: "og:title", content: "FullMetal Falcons" },
-      { property: "og:description", content: "Dinner sign-up app for FullMetal Falcons robotics team" },
+      {
+        property: "og:description",
+        content: "Dinner sign-up app for FullMetal Falcons robotics team",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "FullMetal Falcons" },
       { name: "twitter:site", content: "@FRC4557" },

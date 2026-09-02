@@ -5,12 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { adminGetOverview } from "@/lib/admin-read.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  getStatus,
-  progressDetails,
-  statusOrder,
-  statusStyles,
-} from "@/lib/household-status";
+import { getStatus, progressDetails, statusOrder, statusStyles } from "@/lib/household-status";
 
 export const Route = createFileRoute("/admin/overview")({
   component: AdminOverview,
@@ -26,11 +21,7 @@ function AdminOverview() {
   const [sort, setSort] = useState<"status" | "name">("status");
 
   if (isLoading)
-    return (
-      <Card className="p-6 text-center text-sm text-muted-foreground">
-        Loading…
-      </Card>
-    );
+    return <Card className="p-6 text-center text-sm text-muted-foreground">Loading…</Card>;
   const students = data?.students ?? [];
 
   const sorted = [...students].sort((a, b) => {
@@ -45,9 +36,7 @@ function AdminOverview() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Status overview
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Status overview</h1>
           <p className="text-sm text-muted-foreground">
             Season {data?.season}. Click History for full detail.
           </p>
@@ -82,12 +71,8 @@ function AdminOverview() {
             <Card key={s.id} className={`rounded-xl p-4 ${styles.card}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-foreground">
-                    {s.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {progressDetails(s.progress)}
-                  </div>
+                  <div className="truncate font-medium text-foreground">{s.name}</div>
+                  <div className="text-xs text-muted-foreground">{progressDetails(s.progress)}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
@@ -116,16 +101,12 @@ function AdminOverview() {
                       <ul className="space-y-1 text-sm">
                         {active
                           .sort((a, b) =>
-                            (a.meeting?.date ?? "").localeCompare(
-                              b.meeting?.date ?? "",
-                            ),
+                            (a.meeting?.date ?? "").localeCompare(b.meeting?.date ?? ""),
                           )
                           .map((su) => (
                             <li key={su.id}>
-                              <span className="font-medium">
-                                {su.meeting?.date}
-                              </span>{" "}
-                              — {su.parent?.name}
+                              <span className="font-medium">{su.meeting?.date}</span> —{" "}
+                              {su.parent?.name}
                             </li>
                           ))}
                       </ul>
@@ -145,8 +126,7 @@ function AdminOverview() {
                             {b.approved ? (
                               <span className="text-emerald-700">
                                 approved{" "}
-                                {b.approved_at &&
-                                  new Date(b.approved_at).toLocaleDateString()}
+                                {b.approved_at && new Date(b.approved_at).toLocaleDateString()}
                               </span>
                             ) : (
                               <span className="text-amber-700">pending</span>

@@ -54,11 +54,12 @@ function AdminStudents() {
     if (settings?.default_dinners_required != null && newRequired === "") {
       setNewRequired(settings.default_dinners_required.toString());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   const createStudent = useMutation({
-    mutationFn: (input: { name: string; dinners_required: number | null }) => create({ data: input }),
+    mutationFn: (input: { name: string; dinners_required: number | null }) =>
+      create({ data: input }),
     onSuccess: () => {
       invalidate();
       setNewName("");
@@ -73,9 +74,9 @@ function AdminStudents() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Students & Parents</h1>
         <p className="text-sm text-muted-foreground">
-          Students with their assigned parents and magic-link URLs. Enter the student as Last Name, First Name (Smith,
-          John). For families with more than one student, create only one entry which includes all the student names
-          (Jones, John and Bill).
+          Students with their assigned parents and magic-link URLs. Enter the student as Last Name,
+          First Name (Smith, John). For families with more than one student, create only one entry
+          which includes all the student names (Jones, John and Bill).
         </p>
       </div>
 
@@ -189,7 +190,9 @@ function AdminStudents() {
   );
 }
 
-type Student = Awaited<ReturnType<typeof import("@/lib/admin.functions").adminListStudents>>[number];
+type Student = Awaited<
+  ReturnType<typeof import("@/lib/admin.functions").adminListStudents>
+>[number];
 
 function StudentRow({
   student,
@@ -225,7 +228,13 @@ function StudentRow({
         </div>
         <div className="space-y-1 w-32">
           <Label className="text-xs">Dinners required</Label>
-          <Input type="number" min={0} placeholder="default" value={req} onChange={(e) => setReq(e.target.value)} />
+          <Input
+            type="number"
+            min={0}
+            placeholder="default"
+            value={req}
+            onChange={(e) => setReq(e.target.value)}
+          />
         </div>
         <Button
           size="sm"
@@ -308,7 +317,12 @@ function ParentRow({
     <div className="space-y-2 rounded-md border p-3">
       <div className="flex flex-wrap items-end gap-2">
         <Input value={name} onChange={(e) => setName(e.target.value)} className="w-40" />
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-60" />
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-60"
+        />
         <Button size="sm" variant="outline" onClick={() => onSave({ name, email })}>
           Save
         </Button>
