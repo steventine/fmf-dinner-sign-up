@@ -13,10 +13,10 @@ export const getParentContext = createServerFn({ method: "POST" })
     const parent = await getParentByGuid(data.guid);
 
     // Everything below only depends on the parent row, so run it in parallel.
-    // Progress needs the season, so those two stay chained inside the batch.
+    const season = getActiveSeasonYear();
     const [
       { data: household, error: hhErr },
-      { season, progress },
+      progress,
       { data: meetings, error: mErr },
       { data: mySignUps, error: suErr },
       { data: buyOuts, error: boErr },
@@ -27,10 +27,7 @@ export const getParentContext = createServerFn({ method: "POST" })
         .select("id, name, dinners_required")
         .eq("id", parent.student_id)
         .single(),
-      getActiveSeasonYear().then(async (season) => ({
-        season,
-        progress: await getHouseholdProgress(parent.student_id, season),
-      })),
+      getHouseholdProgress(parent.student_id, season),
       supabaseAdmin
         .from("v_meeting_status")
         .select("meeting_id, date, season_year, notes, student_id, household_name, dinner")
@@ -177,7 +174,7 @@ export const requestBuyOut = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const parent = await getParentByGuid(data.guid);
-    const season = await getActiveSeasonYear();
+    const season = getActiveSeasonYear();
     const { data: settings, error: sErr } = await supabaseAdmin
       .from("settings")
       .select("buyout_price")

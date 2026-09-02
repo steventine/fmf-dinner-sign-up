@@ -80,7 +80,7 @@ export const adminCreateBanquet = createServerFn({ method: "POST" })
   .inputValidator((input) => BanquetDetailsSchema.parse(input))
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const season = await getActiveSeasonYear();
+    const season = getActiveSeasonYear();
     const { data: banquet, error } = await supabaseAdmin
       .from("banquets")
       .insert({

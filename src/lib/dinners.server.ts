@@ -20,24 +20,28 @@ export async function getParentByGuid(guid: string): Promise<ParentRow> {
   return data as ParentRow;
 }
 
-export function currentSeasonYear(today = new Date()): number {
-  // School-year season: Aug–Dec belongs to year that started in August; Jan–Jul belongs to prior August.
-  const y = today.getFullYear();
-  const m = today.getMonth(); // 0-11
-  return m >= 7 ? y : y - 1;
+// The season is an academic year, labeled by the calendar year it starts in:
+// season 2026 runs 2026-07-01 through 2027-06-30. July is the boundary because
+// meetings only ever run Sept–March, so cutting in the summer dead zone can
+// never split a season in two.
+const SEASON_START_MONTH = 7; // 1-based
+
+// The single source of truth for "which season does this date belong to?".
+// Every season_year written to the database must come from here — deriving it
+// per batch, or reading it back off a neighbouring row, is how meetings ended
+// up mislabeled before.
+export function seasonYearForDate(date: string | Date): number {
+  // "YYYY-MM-DD" is parsed by hand so a date-only string can't be shifted
+  // across the boundary by the server's timezone.
+  const [y, m] =
+    typeof date === "string"
+      ? [Number(date.slice(0, 4)), Number(date.slice(5, 7))]
+      : [date.getFullYear(), date.getMonth() + 1];
+  return m >= SEASON_START_MONTH ? y : y - 1;
 }
 
-export async function getActiveSeasonYear(today = new Date()): Promise<number> {
-  const todayIso = today.toISOString().slice(0, 10);
-  const { data, error } = await supabaseAdmin
-    .from("meetings")
-    .select("season_year")
-    .gte("date", todayIso)
-    .order("date", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.season_year ?? currentSeasonYear(today);
+export function getActiveSeasonYear(today = new Date()): number {
+  return seasonYearForDate(today);
 }
 
 export type HouseholdProgress = {

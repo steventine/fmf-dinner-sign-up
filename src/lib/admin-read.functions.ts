@@ -92,7 +92,7 @@ export const adminGetOverview = createServerFn({ method: "POST" }).handler(async
     .order("name");
   if (error) throw new Error(error.message);
 
-  const season = await getActiveSeasonYear();
+  const season = getActiveSeasonYear();
   const progressByStudent = await getAllHouseholdProgress(season);
   const enriched = (students ?? []).map((s) => ({
     ...s,

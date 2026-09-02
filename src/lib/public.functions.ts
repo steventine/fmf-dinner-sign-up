@@ -18,7 +18,7 @@ export const getPublicSchedule = createServerFn({ method: "GET" }).handler(async
     .order("name");
   if (stErr) throw new Error(stErr.message);
 
-  const season = await getActiveSeasonYear();
+  const season = getActiveSeasonYear();
   const progressByStudent = await getAllHouseholdProgress(season);
   const households = (students ?? []).map((s) => ({
     ...s,

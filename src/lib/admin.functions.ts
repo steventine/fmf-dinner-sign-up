@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendTemplateToParentAndLog } from "./email.server";
-import { getActiveSeasonYear, requireAdminUserId } from "./dinners.server";
+import { getActiveSeasonYear, requireAdminUserId, seasonYearForDate } from "./dinners.server";
 
 function formatMeetingDate(date: string): string {
   const d = new Date(date + "T12:00:00Z");
@@ -194,9 +194,7 @@ export const adminCreateMeeting = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await requireAdminUserId();
-    const d = new Date(data.date + "T12:00:00Z");
-    const m = d.getUTCMonth();
-    const season_year = m >= 7 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+    const season_year = seasonYearForDate(data.date);
     const { data: row, error } = await supabaseAdmin
       .from("meetings")
       .insert({ date: data.date, season_year, notes: data.notes ?? null })
@@ -335,13 +333,12 @@ export const adminGenerateSeasonSchedule = createServerFn({ method: "POST" })
     const missing = candidates.filter((d) => !existingSet.has(d));
     if (missing.length === 0) return { created: 0, skipped: candidates.length };
 
-    const startYear = new Date(start + "T12:00:00Z").getUTCFullYear();
-    const startMonth = new Date(start + "T12:00:00Z").getUTCMonth();
-    const seasonYear = startMonth >= 7 ? startYear : startYear - 1;
-
+    // Per meeting date, not per batch: a schedule generated in the spring for
+    // the coming autumn spans the boundary, and one season_year for the whole
+    // range would put every meeting in the wrong season.
     const rows = missing.map((date) => ({
       date,
-      season_year: seasonYear,
+      season_year: seasonYearForDate(date),
       notes: null,
     }));
     const { error } = await supabaseAdmin.from("meetings").insert(rows);
@@ -410,7 +407,7 @@ export const adminCreateBuyOut = createServerFn({ method: "POST" })
     if (sErr) throw new Error(sErr.message);
     const amount = Number(s.buyout_price) * data.dinners;
 
-    const season = data.season_year ?? (await getActiveSeasonYear());
+    const season = data.season_year ?? getActiveSeasonYear();
 
     const approved = data.approved ?? true;
     const { error } = await supabaseAdmin.from("buy_outs").insert({

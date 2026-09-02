@@ -1,7 +1,7 @@
 // Audience resolution, scheduled heartbeat, and shared send logic for the campaign manager.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderEmailHtml, renderTemplateString, sendEmailBatchViaResend } from "./email.server";
-import { currentSeasonYear, getAllHouseholdProgress } from "./dinners.server";
+import { getActiveSeasonYear, getAllHouseholdProgress } from "./dinners.server";
 import { formatBanquetDate, getActiveBanquet } from "./banquet.server";
 
 type ParentRecipient = {
@@ -62,7 +62,7 @@ async function resolveAudience(
   }
 
   if (audienceType === "parents_below_quota") {
-    const season = currentSeasonYear();
+    const season = getActiveSeasonYear();
     const progressByStudent = await getAllHouseholdProgress(season);
 
     const remainingMap = new Map<string, number>();

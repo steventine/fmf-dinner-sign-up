@@ -28,7 +28,7 @@ export type BanquetRow = {
 };
 
 export async function getActiveBanquet(): Promise<BanquetRow | null> {
-  const season = await getActiveSeasonYear();
+  const season = getActiveSeasonYear();
   const { data, error } = await supabaseAdmin
     .from("banquets")
     .select("id, season_year, date, time, location, notes")
