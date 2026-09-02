@@ -113,7 +113,7 @@ function SendStatusBadge({
   };
 }) {
   const shown = log.delivery_status ?? log.status;
-  const bad = ["failed", "bounced", "complained"].includes(shown);
+  const bad = ["failed", "bounced", "complained", "suppressed"].includes(shown);
   return (
     <Badge
       variant={bad ? "destructive" : "secondary"}

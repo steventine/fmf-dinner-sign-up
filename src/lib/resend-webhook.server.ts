@@ -7,7 +7,7 @@ const REPLAY_TOLERANCE_SECONDS = 300;
 
 // Statuses that must not be overwritten by a later delivered/delayed event
 // (webhook events can arrive out of order).
-const TERMINAL_STATUSES = new Set(["bounced", "complained"]);
+const TERMINAL_STATUSES = new Set(["bounced", "complained", "suppressed"]);
 
 const STATUS_BY_EVENT: Record<string, string> = {
   "email.delivered": "delivered",
@@ -15,6 +15,9 @@ const STATUS_BY_EVENT: Record<string, string> = {
   "email.complained": "complained",
   "email.delivery_delayed": "delayed",
   "email.failed": "failed",
+  // Resend blocked the send outright (recipient on the suppression list), so it
+  // never reaches the provider — distinct from a bounce, which was attempted.
+  "email.suppressed": "suppressed",
 };
 
 function timingSafeEqual(a: string, b: string): boolean {
