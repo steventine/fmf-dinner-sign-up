@@ -136,8 +136,10 @@ with provider URL `https://token.actions.githubusercontent.com` and audience
       "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
-        "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-        "StringLike": { "token.actions.githubusercontent.com:sub": "repo:steventine/fmf-dinner-sign-up:*" }
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:steventine/fmf-dinner-sign-up:ref:refs/heads/master"
+        }
       }
     }
   ]
@@ -165,13 +167,16 @@ nobody retries it:
 
 `pg_dump` sets `row_security = off` and **errors out** rather than dumping partial data if
 the connecting role cannot bypass RLS — and this database has RLS on `settings`, `meetings`,
-and `students`. So a backup role needs `BYPASSRLS`. On PostgreSQL 14 only a true superuser
-can set that attribute, and this project's `postgres` role is `rolsuper = false` (it has
-`BYPASSRLS` and `CREATEROLE`, but neither is sufficient — both `create role … bypassrls` and
-`alter role … bypassrls` fail with `must be superuser`). Verified against PostgreSQL 14 with
-a role configured identically to this project's.
+and `students`. So a backup role needs `BYPASSRLS`, and this project's `postgres` role is
+`rolsuper = false` (it does have `BYPASSRLS` and `CREATEROLE`).
 
-Revisit only if Supabase exposes superuser access or a `pg_dump`-capable read-only role.
+On PostgreSQL 14, that combination is not enough: both `create role … bypassrls` and
+`alter role … bypassrls` fail with `must be superuser`, verified against a role configured
+identically to this one. **This server is PostgreSQL 17.6, and PostgreSQL 16 changed
+`CREATEROLE` so that such a role can grant attributes it already holds — so the read-only
+role may in fact be possible here. Untested as of this writing.** Until someone confirms it
+on 17, the workflow uses the `postgres` credential.
+
 Because the `postgres` password is used nowhere else in this stack, rotating it in the
 Supabase dashboard costs nothing but re-entering the secret in step 5 — worth doing if you
 ever suspect exposure.

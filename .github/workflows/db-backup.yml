@@ -35,7 +35,7 @@ jobs:
 
       # The runner image ships an older pg_dump, and pg_dump refuses to read a
       # server newer than itself. Pin a client that outruns any Supabase upgrade.
-      - name: Install PostgreSQL 17 client
+      - name: Install PostgreSQL client
         run: |
           set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
@@ -44,8 +44,24 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-17
-          pg_dump --version
+          # Metapackage, not a pinned major: pg_dump refuses to read a server newer
+          # than itself, so this has to keep pace with Supabase's upgrades on its own.
+          # A client newer than the server is explicitly supported.
+          sudo apt-get install -y -qq postgresql-client
+
+          # /usr/bin/pg_dump is Debian's pg_wrapper shim, which dispatches to a
+          # DEFAULT version rather than the newest installed — on this runner that
+          # is the preinstalled 16, which then aborts on a 17 server. Put the real
+          # versioned binary ahead of the shim on PATH.
+          bindir="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          echo "$bindir" >> "$GITHUB_PATH"
+
+          client_major="$("$bindir/pg_dump" --version | grep -oE '[0-9]+' | head -1)"
+          echo "pg_dump ${client_major} at ${bindir}"
+          if [ "$client_major" -lt 17 ]; then
+            echo "::error::resolved pg_dump ${client_major}, which cannot dump this server"
+            exit 1
+          fi
 
       - name: Name this backup
         id: name
