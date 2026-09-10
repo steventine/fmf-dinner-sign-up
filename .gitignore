@@ -40,3 +40,8 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Local database backups (contain parent PII — never commit)
+restore/
+backup-json/
+*.tar.gz.gpg

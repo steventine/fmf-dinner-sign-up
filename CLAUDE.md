@@ -45,7 +45,7 @@ No test framework is configured.
 2. Parents → unique GUID embedded in emailed link → validated per-request server-side
 3. Admins → Supabase Auth (email/password or Google OAuth) + `user_roles` table with `role='admin'`; first authenticated user auto-claims admin via bootstrap logic
 
-**Email:** Sent via Resend through a Lovable connector gateway. Templates stored in the `email_templates` DB table and rendered with `{{variable}}` interpolation in `src/lib/email.server.ts`.
+**Email:** Sent via the Resend REST API directly (`api.resend.com`, `RESEND_API_KEY`) from `src/lib/email.server.ts`. Templates are Markdown in the `email_templates` DB table, interpolated with `{{variable}}` and rendered to HTML with `marked`. Bulk sends go through Resend's batch endpoint in chunks of 100 to stay inside the Workers subrequest budget. Delivery status comes back on `POST /api/webhooks/resend` (Svix-signed, handled in `src/server.ts` before the router) and updates `email_send_log`.
 
 ## Key Database Objects
 
@@ -71,7 +71,7 @@ Server-only (set in hosting environment, not `.env`):
 
 - `SUPABASE_SERVICE_ROLE_KEY` — admin DB access
 - `RESEND_API_KEY` — email sending
-- `LOVABLE_API_KEY` — Lovable connector gateway auth
+- `RESEND_WEBHOOK_SECRET` — Svix signing secret for the delivery webhook
 
 ## UI
 

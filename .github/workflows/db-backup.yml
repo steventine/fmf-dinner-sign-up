@@ -1,0 +1,219 @@
+# Nightly logical backup of the Supabase database to S3.
+#
+# Produces one gzipped tarball per run containing:
+#   - public-schema-and-data.sql  pg_dump of the public schema (the restore path)
+#   - auth-users-reference.sql    admin auth rows, for reference when rebuilding logins
+#   - row-counts.tsv              per-table row counts read back out of the dump
+#   - MANIFEST.TXT                timestamp, commit, row counts
+#
+# Setup and restore instructions live in README.md under "Database backups".
+name: Database backup
+
+on:
+  schedule:
+    # 07:15 UTC — roughly 3:15am in America/New_York year round.
+    - cron: "15 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required for AWS OIDC; harmless when using static keys
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The runner image ships an older pg_dump, and pg_dump refuses to read a
+      # server newer than itself. Pin a client that outruns any Supabase upgrade.
+      - name: Install PostgreSQL 17 client
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Name this backup
+        id: name
+        run: |
+          set -euo pipefail
+          echo "base=fmf-dinner-signup-$(date -u +%Y-%m-%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: pg_dump public schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          # Privileges are kept deliberately: the GRANTs to anon/authenticated are
+          # what let the public calendar read the restored database.
+          pg_dump "$SUPABASE_DB_URL" \
+            --schema=public \
+            --no-owner \
+            --clean --if-exists \
+            --format=plain \
+            --file=work/public-schema-and-data.sql
+
+      - name: pg_dump auth users (reference only)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          # Admin logins live in Supabase's auth schema, which a restored project
+          # recreates on its own. This dump records who had an account; it is not a
+          # restore step, so a failure here must not sink an otherwise good backup.
+          if pg_dump "$SUPABASE_DB_URL" \
+              --data-only --no-owner --format=plain \
+              --table=auth.users --table=auth.identities \
+              --file=work/auth-users-reference.sql 2> auth-dump-error.txt; then
+            rm -f auth-dump-error.txt
+          else
+            echo "::warning::auth users dump failed; continuing without it"
+            mv auth-dump-error.txt work/auth-users-reference.SKIPPED.txt
+            rm -f work/auth-users-reference.sql
+            echo "AUTH_DUMP_SKIPPED=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify the dump
+        run: |
+          set -euo pipefail
+          sql=work/public-schema-and-data.sql
+
+          size=$(stat -c%s "$sql")
+          if [ "$size" -lt 5000 ]; then
+            echo "::error::$sql is only $size bytes — the dump looks truncated"
+            exit 1
+          fi
+          if ! grep -q "CREATE TABLE public.parents" "$sql"; then
+            echo "::error::$sql does not define public.parents — the schema is missing"
+            exit 1
+          fi
+
+          # Row counts are read back out of the dump rather than queried separately,
+          # so this checks the artifact that would actually be restored. Tracking
+          # COPY-block state matters: template bodies are free-form Markdown and can
+          # contain a line that looks exactly like a COPY header.
+          if ! awk '
+            /^COPY public\.[A-Za-z_][A-Za-z0-9_]* \(/ {
+              if (!inCopy) { t = $2; sub(/^public\./, "", t); inCopy = 1; n = 0; next }
+            }
+            inCopy && $0 == "\\." { print t "\t" n; inCopy = 0; next }
+            inCopy { n++ }
+            END { if (inCopy) exit 1 }
+          ' "$sql" > work/row-counts.tsv; then
+            echo "::error::the dump ends inside a COPY block — it was cut short"
+            exit 1
+          fi
+
+          total=$(awk -F'\t' '{s += $2} END {print s + 0}' work/row-counts.tsv)
+          echo "Captured ${total} row(s) across $(wc -l < work/row-counts.tsv) table(s) from a ${size} byte dump"
+
+          # A backup faithfully records an accidental TRUNCATE or mass delete, and
+          # then retention quietly ages out the last good copy. These four tables are
+          # never legitimately empty, so an empty one means something upstream went
+          # wrong and is worth failing on. (RLS misconfiguration does NOT land here:
+          # pg_dump sets row_security=off and errors outright if the role cannot
+          # bypass RLS, so that failure surfaces in the dump step, not this one.)
+          # If a table is ever legitimately emptied, drop it from this list.
+          for t in parents students email_templates settings; do
+            n=$(awk -F'\t' -v t="$t" '$1 == t {print $2}' work/row-counts.tsv)
+            if [ -z "$n" ]; then
+              echo "::error::no COPY block for ${t} — the dump is incomplete"
+              exit 1
+            fi
+            if [ "$n" -lt 1 ]; then
+              echo "::error::${t} is empty — verify the source database before trusting this backup"
+              exit 1
+            fi
+          done
+
+      - name: Write manifest and archive
+        id: archive
+        run: |
+          set -euo pipefail
+          {
+            echo "backup       ${{ steps.name.outputs.base }}"
+            echo "generated_at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "repo_commit  $GITHUB_SHA"
+            echo "run_url      $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "pg_dump      $(pg_dump --version)"
+            echo ""
+            echo "Row counts:"
+            awk -F'\t' '{printf "  %-28s %s\n", $1, $2}' work/row-counts.tsv
+          } > work/MANIFEST.TXT
+          tar -czf "${{ steps.name.outputs.base }}.tar.gz" -C work .
+          echo "file=${{ steps.name.outputs.base }}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Encrypt (when a passphrase is configured)
+        id: encrypt
+        env:
+          BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          file="${{ steps.archive.outputs.file }}"
+          if [ -z "${BACKUP_GPG_PASSPHRASE:-}" ]; then
+            echo "No BACKUP_GPG_PASSPHRASE set — uploading unencrypted (S3 SSE still applies)."
+            echo "file=$file" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$BACKUP_GPG_PASSPHRASE" > pass.txt
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase-file pass.txt --output "$file.gpg" "$file"
+          shred -u pass.txt "$file"
+          echo "file=$file.gpg" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Set either AWS_BACKUP_ROLE_ARN (OIDC, preferred) or the static key pair.
+          role-to-assume: ${{ secrets.AWS_BACKUP_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Upload to S3
+        id: upload
+        env:
+          BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          PREFIX: ${{ vars.BACKUP_S3_PREFIX || 'fmf-dinner-signup' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BUCKET:-}" ]; then
+            echo "::error::Repository variable BACKUP_S3_BUCKET is not set"
+            exit 1
+          fi
+          key="s3://$BUCKET/$PREFIX/${{ steps.encrypt.outputs.file }}"
+          aws s3 cp "${{ steps.encrypt.outputs.file }}" "$key" --sse AES256 --only-show-errors
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Database backup"
+            echo ""
+            echo "- Archive: \`${{ steps.encrypt.outputs.file }}\`"
+            echo "- Uploaded to: \`${{ steps.upload.outputs.key }}\`"
+            if [ -n "${AUTH_DUMP_SKIPPED:-}" ]; then
+              echo "- :warning: auth users dump was skipped (see auth-users-reference.SKIPPED.txt in the archive)"
+            fi
+            echo ""
+            if [ -f work/row-counts.tsv ]; then
+              echo "| table | rows |"
+              echo "| --- | --- |"
+              awk -F'\t' '{print "| " $1 " | " $2 " |"}' work/row-counts.tsv
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -87,6 +87,185 @@ To create a new migration file:
 supabase migration new <description>
 ```
 
+## Database backups
+
+A GitHub Actions workflow (`.github/workflows/db-backup.yml`) dumps the database
+every night at 07:15 UTC (~3:15am Eastern) and uploads one archive to S3. You can also
+run it on demand from **Actions → Database backup → Run workflow**.
+
+Each archive contains:
+
+| File                          | Purpose                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `public-schema-and-data.sql`  | `pg_dump` of the `public` schema — tables, views, functions, policies, grants, and all data. **This is the restore path.** |
+| `auth-users-reference.sql`    | The `auth.users` / `auth.identities` rows, for reference only. Supabase manages the auth schema itself; you re-create logins rather than restoring these. |
+| `row-counts.tsv`              | Per-table row counts, read back out of the dump itself rather than queried separately — so they describe the artifact you would actually restore. |
+| `MANIFEST.TXT`                | Timestamp, the repo commit, and row counts — check this first when opening a backup. |
+
+**Not covered:** Supabase Auth accounts (recreated by signing in again), and the
+Cloudflare, Resend, and Google OAuth configuration — those are documented in the
+sections below and rebuilt by hand.
+
+If a nightly run fails, GitHub emails the repository owner. The Actions tab is the
+place to confirm backups are still running.
+
+Two things about scheduled workflows are worth knowing, because both fail quietly:
+they only run from the **default branch**, so the workflow has to be merged to `master`
+to do anything; and GitHub **disables scheduled workflows in a repository with no commit
+activity for 60 days**, re-enabling them only when someone clicks the banner in the Actions
+tab. During a quiet off-season, glance at the Actions tab occasionally.
+
+### One-time setup
+
+**1. Create the S3 bucket.** Block all public access, enable default encryption, and add
+a lifecycle rule expiring objects under the `fmf-dinner-signup/` prefix after however long
+you want to keep them. The whole database is well under a megabyte compressed, so keeping
+a year of nightlies costs essentially nothing.
+
+**2. Give the workflow write access to the bucket.** The preferred route is GitHub's OIDC,
+which needs no long-lived keys. In IAM, add an identity provider of type **OpenID Connect**
+with provider URL `https://token.actions.githubusercontent.com` and audience
+`sts.amazonaws.com`, then create a role trusting it:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+        "StringLike": { "token.actions.githubusercontent.com:sub": "repo:steventine/fmf-dinner-sign-up:*" }
+      }
+    }
+  ]
+}
+```
+
+Attach a permissions policy that only allows writing new objects — deliberately no
+`GetObject`, so a compromised workflow cannot read back old backups:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::<BUCKET>/fmf-dinner-signup/*" }
+  ]
+}
+```
+
+(If you would rather use an IAM user, skip the role and set `AWS_ACCESS_KEY_ID` /
+`AWS_SECRET_ACCESS_KEY` as secrets instead — the workflow accepts either.)
+
+**3. Use the `postgres` database credential.** A dedicated read-only backup role would be
+preferable, but it is not available on this project, and the reason is worth recording so
+nobody retries it:
+
+`pg_dump` sets `row_security = off` and **errors out** rather than dumping partial data if
+the connecting role cannot bypass RLS — and this database has RLS on `settings`, `meetings`,
+and `students`. So a backup role needs `BYPASSRLS`. On PostgreSQL 14 only a true superuser
+can set that attribute, and this project's `postgres` role is `rolsuper = false` (it has
+`BYPASSRLS` and `CREATEROLE`, but neither is sufficient — both `create role … bypassrls` and
+`alter role … bypassrls` fail with `must be superuser`). Verified against PostgreSQL 14 with
+a role configured identically to this project's.
+
+Revisit only if Supabase exposes superuser access or a `pg_dump`-capable read-only role.
+Because the `postgres` password is used nowhere else in this stack, rotating it in the
+Supabase dashboard costs nothing but re-entering the secret in step 5 — worth doing if you
+ever suspect exposure.
+
+**4. Get the database connection string.** In the Supabase dashboard under
+**Settings → Database → Connection string**, copy the **Session pooler** URI (port `5432`)
+and substitute your database password. Use the session
+pooler, not the direct connection (IPv6-only, which GitHub runners cannot reach) and not the
+transaction pooler on port `6543` (which `pg_dump` cannot use).
+
+**5. Add the repository secrets and variables** under **Settings → Secrets and variables → Actions**:
+
+| Name                       | Kind     | Value                                                     |
+| -------------------------- | -------- | --------------------------------------------------------- |
+| `SUPABASE_DB_URL`          | Secret   | Session pooler URI from step 4                             |
+| `AWS_BACKUP_ROLE_ARN`      | Secret   | The role ARN from step 2 (omit if using access keys)       |
+| `BACKUP_GPG_PASSPHRASE`    | Secret   | Optional; see below                                        |
+| `BACKUP_S3_BUCKET`         | Variable | The bucket name                                            |
+| `BACKUP_S3_PREFIX`         | Variable | Optional; defaults to `fmf-dinner-signup`                  |
+| `AWS_REGION`               | Variable | Optional; defaults to `us-east-1`                          |
+
+**6. Run it once by hand** from the Actions tab and confirm the object lands in S3. The
+run summary prints the row count for every table.
+
+#### Optional: encrypt the archives
+
+Backups contain parent names, email addresses, and the `unique_guid` values that act as
+the credential for parent sign-up links. A private bucket with default encryption already
+protects them at rest. If you want the archive encrypted before it ever leaves the runner,
+set a `BACKUP_GPG_PASSPHRASE` secret — the workflow will then symmetrically encrypt with
+AES-256 and upload a `.tar.gz.gpg`. **Store that passphrase somewhere you will still have
+it when the database is gone**; without it the backups are unrecoverable.
+
+### Restoring
+
+```bash
+BACKUP_S3_BUCKET=<bucket> ./scripts/fetch-backup.sh
+```
+
+That downloads the newest archive, decrypts it if needed, unpacks it under `./restore/`,
+and prints the manifest. Set `BACKUP_FILE=<name>` to pull a specific older backup instead.
+
+Then, to bring the app back up on a fresh Supabase project:
+
+1. Create a new Supabase project and note its project ref, database password, and API keys.
+2. Load the dump — it recreates every table, view, function, RLS policy, grant, and row:
+
+   ```bash
+   psql "<new-session-pooler-uri>" -v ON_ERROR_STOP=1 -f restore/<backup-name>/public-schema-and-data.sql
+   ```
+
+   The dump is generated with `--clean --if-exists`, so it drops each object before
+   recreating it and can be replayed over a database that already has the schema. If
+   `psql` halts on an error about the `public` schema itself already existing, that one
+   statement is safe to skip — a Supabase project always ships with `public` in place.
+
+3. Re-create admin access: sign up at `/login` with your email. The first authenticated
+   user auto-claims admin (see **First admin user**). The restored `admin_email_allowlist`
+   table and `auth-users-reference.sql` in the archive record who else had access.
+4. Point the app at the new project — update `SUPABASE_URL` in `wrangler.jsonc` and in
+   `.env`, set the new `SUPABASE_SERVICE_ROLE_KEY` and publishable key, and redeploy.
+5. Redo the external configuration: **Changing the Site URL**, **Google OAuth setup**, and
+   **Resend webhook setup** below.
+6. Verify: the public calendar lists meetings, **Admin → Emails** loads the send log, and a
+   parent sign-up page opens — grab a GUID to try with:
+
+   ```bash
+   psql "<new-session-pooler-uri>" -Atc "select unique_guid from public.parents limit 1"
+   ```
+
+Because the migrations in `supabase/migrations/` are in git, `supabase db push` against a
+new project is an alternative way to rebuild the schema — but the dump is preferred, since
+it is a snapshot of what production actually looked like rather than a replay.
+
+### Manual JSON export
+
+Separate from the nightly backup, `scripts/export-json.ts` dumps every table to JSON by
+reading the live PostgREST API with the service role key from `.env`:
+
+```bash
+bun run backup:json
+```
+
+This is a convenience for inspecting or diffing data while the database is up — it is
+deliberately **not** part of the workflow, because it authenticates with
+`SUPABASE_SERVICE_ROLE_KEY` and keeping it in CI would mean storing that key in GitHub.
+`pg_dump` already captures everything it does. It reads the live database, so it is no help
+during an actual outage; to get JSON out of an archived backup, restore the dump first and
+then query it:
+
+```bash
+psql "$DB_URL" -Atc "select json_agg(t) from public.parents t" > parents.json
+```
+
 ## Deployment
 
 The app targets **Cloudflare Workers** via the Wrangler config in `wrangler.jsonc`. The server entry point is `src/server.ts`.
