@@ -98,7 +98,6 @@ Each archive contains:
 | File                          | Purpose                                                                       |
 | ----------------------------- | ----------------------------------------------------------------------------- |
 | `public-schema-and-data.sql`  | `pg_dump` of the `public` schema — tables, views, functions, policies, grants, and all data. **This is the restore path.** |
-| `auth-users-reference.sql`    | The `auth.users` / `auth.identities` rows, for reference only. Supabase manages the auth schema itself; you re-create logins rather than restoring these. |
 | `row-counts.tsv`              | Per-table row counts, read back out of the dump itself rather than queried separately — so they describe the artifact you would actually restore. |
 | `MANIFEST.TXT`                | Timestamp, the repo commit, and row counts — check this first when opening a backup. |
 
@@ -161,29 +160,44 @@ Attach a permissions policy that only allows writing new objects — deliberatel
 (If you would rather use an IAM user, skip the role and set `AWS_ACCESS_KEY_ID` /
 `AWS_SECRET_ACCESS_KEY` as secrets instead — the workflow accepts either.)
 
-**3. Use the `postgres` database credential.** A dedicated read-only backup role would be
-preferable, but it is not available on this project, and the reason is worth recording so
-nobody retries it:
+**3. Create a read-only backup role.** The workflow only ever reads, so it should not hold a
+credential that can drop tables. Run this in the Supabase SQL editor:
 
-`pg_dump` sets `row_security = off` and **errors out** rather than dumping partial data if
-the connecting role cannot bypass RLS — and this database has RLS on `settings`, `meetings`,
-and `students`. So a backup role needs `BYPASSRLS`, and this project's `postgres` role is
-`rolsuper = false` (it does have `BYPASSRLS` and `CREATEROLE`).
+```sql
+create role backup_ro with login password '<generate a long random password>' bypassrls;
 
-On PostgreSQL 14, that combination is not enough: both `create role … bypassrls` and
-`alter role … bypassrls` fail with `must be superuser`, verified against a role configured
-identically to this one. **This server is PostgreSQL 17.6, and PostgreSQL 16 changed
-`CREATEROLE` so that such a role can grant attributes it already holds — so the read-only
-role may in fact be possible here. Untested as of this writing.** Until someone confirms it
-on 17, the workflow uses the `postgres` credential.
+grant usage on schema public to backup_ro;
+grant select on all tables in schema public to backup_ro;
+grant select on all sequences in schema public to backup_ro;
 
-Because the `postgres` password is used nowhere else in this stack, rotating it in the
-Supabase dashboard costs nothing but re-entering the secret in step 5 — worth doing if you
-ever suspect exposure.
+-- So tables added by future migrations are readable without revisiting this.
+alter default privileges in schema public grant select on tables to backup_ro;
+alter default privileges in schema public grant select on sequences to backup_ro;
+```
+
+`BYPASSRLS` is not optional. `pg_dump` sets `row_security = off` and **errors out** rather
+than dumping partial data if the connecting role cannot bypass RLS, and this database has
+RLS on `settings`, `meetings`, and `students`. A backup role without it produces no backup
+at all — which is at least a loud failure, but still a failure.
+
+This works because the server is PostgreSQL 17 and this project's `postgres` role holds both
+`CREATEROLE` and `BYPASSRLS`; since PostgreSQL 16, such a role can grant attributes it
+already possesses. It would **not** work on PostgreSQL 14 or 15, where setting `BYPASSRLS`
+requires a true superuser — worth knowing if this is ever ported to an older project.
+
+Verified end to end against PostgreSQL 17: the dump comes back complete with all grants and
+policies intact, `backup_ro` is refused on insert, update, delete, drop, and create, and a
+table added afterwards is picked up automatically by the default privileges above.
+
+This is deliberately **not** a migration in `supabase/migrations/`. It creates a credential
+rather than schema, the statement carries a password, and this repository is public.
 
 **4. Get the database connection string.** In the Supabase dashboard under
 **Settings → Database → Connection string**, copy the **Session pooler** URI (port `5432`)
-and substitute your database password. Use the session
+and substitute the `backup_ro` credentials from step 3 — the pooler encodes the role in the
+username, so `postgres.<project-ref>` becomes `backup_ro.<project-ref>`. If the pooler
+rejects that (this is the one link not verified locally), fall back to the `postgres`
+credential and the backup still works; you just lose the read-only hardening. Use the session
 pooler, not the direct connection (IPv6-only, which GitHub runners cannot reach) and not the
 transaction pooler on port `6543` (which `pg_dump` cannot use).
 
@@ -235,7 +249,8 @@ Then, to bring the app back up on a fresh Supabase project:
 
 3. Re-create admin access: sign up at `/login` with your email. The first authenticated
    user auto-claims admin (see **First admin user**). The restored `admin_email_allowlist`
-   table and `auth-users-reference.sql` in the archive record who else had access.
+   and `user_roles` tables record who else had access; Supabase Auth accounts themselves
+   are not backed up, and are re-created by each admin signing in again.
 4. Point the app at the new project — update `SUPABASE_URL` in `wrangler.jsonc` and in
    `.env`, set the new `SUPABASE_SERVICE_ROLE_KEY` and publishable key, and redeploy.
 5. Redo the external configuration: **Changing the Site URL**, **Google OAuth setup**, and

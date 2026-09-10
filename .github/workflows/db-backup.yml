@@ -2,7 +2,6 @@
 #
 # Produces one gzipped tarball per run containing:
 #   - public-schema-and-data.sql  pg_dump of the public schema (the restore path)
-#   - auth-users-reference.sql    admin auth rows, for reference when rebuilding logins
 #   - row-counts.tsv              per-table row counts read back out of the dump
 #   - MANIFEST.TXT                timestamp, commit, row counts
 #
@@ -28,10 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       # The runner image ships an older pg_dump, and pg_dump refuses to read a
       # server newer than itself. Pin a client that outruns any Supabase upgrade.
@@ -84,25 +79,11 @@ jobs:
             --format=plain \
             --file=work/public-schema-and-data.sql
 
-      - name: pg_dump auth users (reference only)
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -uo pipefail
-          # Admin logins live in Supabase's auth schema, which a restored project
-          # recreates on its own. This dump records who had an account; it is not a
-          # restore step, so a failure here must not sink an otherwise good backup.
-          if pg_dump "$SUPABASE_DB_URL" \
-              --data-only --no-owner --format=plain \
-              --table=auth.users --table=auth.identities \
-              --file=work/auth-users-reference.sql 2> auth-dump-error.txt; then
-            rm -f auth-dump-error.txt
-          else
-            echo "::warning::auth users dump failed; continuing without it"
-            mv auth-dump-error.txt work/auth-users-reference.SKIPPED.txt
-            rm -f work/auth-users-reference.sql
-            echo "AUTH_DUMP_SKIPPED=1" >> "$GITHUB_ENV"
-          fi
+      # There is deliberately no dump of Supabase's auth schema. Those rows are never
+      # restored — Supabase manages that schema, and admin logins are re-created by
+      # signing in again — and the only part worth keeping, which accounts existed, is
+      # already captured by public.admin_email_allowlist and public.user_roles. Reading
+      # it would also mean widening backup_ro beyond the public schema for no gain.
 
       - name: Verify the dump
         run: |
@@ -223,9 +204,6 @@ jobs:
             echo ""
             echo "- Archive: \`${{ steps.encrypt.outputs.file }}\`"
             echo "- Uploaded to: \`${{ steps.upload.outputs.key }}\`"
-            if [ -n "${AUTH_DUMP_SKIPPED:-}" ]; then
-              echo "- :warning: auth users dump was skipped (see auth-users-reference.SKIPPED.txt in the archive)"
-            fi
             echo ""
             if [ -f work/row-counts.tsv ]; then
               echo "| table | rows |"
